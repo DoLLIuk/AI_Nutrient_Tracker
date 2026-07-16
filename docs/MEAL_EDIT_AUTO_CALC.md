@@ -1,236 +1,116 @@
-# Meal Edit Auto-Calc
+# Manual Meal Forms and Nutrition Calculation
 
 ## Purpose
 
-This document explains the current `Add Meal / Edit Meal` nutrition form behavior in the Flutter client.
+This document records the product rules for the Flutter client's `Add Meal` and `Edit Meal` forms. The calculation and state logic lives on-device: `lib/meal_edit_draft.dart` contains the draft rules, and `lib/main.dart` owns the manual meal sheet UI.
 
-The goal is to help future developers or AI agents change the feature safely without re-discovering the product rules from widget tests.
+## Add Meal status
 
-Important:
-- This logic is frontend-only and runs on the device.
-- Backend is not involved in manual meal add/edit recalculation.
-- Current implementation lives in `lib/meal_edit_draft.dart` for the draft math/locking rules and in the manual meal bottom sheet flow inside `lib/main.dart`.
-- Existing meal consistency scan uses a `15%` tolerance for calorie-vs-macro mismatch, so small historical rounding differences do not trigger `Reset auto-calc`.
+**Status: production-ready for the closed beta.**
 
-## Core Rules
+`Add Meal` is feature-frozen. Do not introduce new controls, new calculation models, or new interaction patterns to this form during the beta. Changes are limited to bug fixes that preserve the contracts below. Any product change requires an explicit post-beta decision backed by user feedback.
 
-The form has five linked nutrition fields:
-- `Calories`
-- `Weight`
-- `Protein`
-- `Fat`
-- `Carbs`
+`Edit Meal` has a separate, legacy-compatible interaction model and is not covered by that feature freeze.
 
-### Calories formula
+## Shared nutrition facts
 
-Calories are derived from macros with the standard formula:
+The nutrition fields are `Weight`, `Protein`, `Fat`, `Carbs`, and `Calories`. Protein, fat, and carbs are shown in grams; calories are shown in kcal.
+
+Calories use the standard formula:
 
 ```text
 protein * 4 + fat * 9 + carbs * 4
 ```
 
-### Weight behavior
+`Weight` is always a physical, user-controlled value. It is never inferred from calories or macros. No flow may invent or auto-fill weight in grams.
 
-`Weight` is always a manual user-controlled field.
+## Add Meal
 
-Rules:
-- `Weight` is never derived from calories or macros.
-- If the user edits `Weight`, it becomes the source of change for that interaction.
-- `Weight` scales only unlocked nutrition values.
-- `Weight` does not participate in locked-calories auto-adjust confirm as an auto-adjust target.
+### Form and input behavior
 
-This is intentional and should not be changed casually. Product decision: weight is treated as a physical quantity, not a derived nutrition number.
+- The form order is name, a 2x2 `Weight` / `Protein` / `Fat` / `Carbs` grid, `Calories`, then meal type.
+- Unit context is inside the inputs (`g` for the four gram fields and `kcal` for calories); the labels do not repeat the unit.
+- All nutrition inputs request a decimal numeric keyboard on mobile.
+- A new meal starts with empty numeric controllers. Examples such as `e.g. 250` are placeholders, not values. They disappear after the first focus and never enter calculations or saved data.
+- A typed `0` is a real value. New Add Meal input does not add a trailing `.0` automatically.
+- The default meal type is derived from the current time rather than always being breakfast.
+- Add Meal does not expose the old yellow locks, lock icons, reset action, or revert action.
 
-## Session-Scoped Locking
+### Calculated calories
 
-Each manual edit session starts when the meal sheet opens and ends when the sheet closes.
+- Calories remain unavailable until the user has entered all three macros: protein, fat, and carbs.
+- Once all three are present, calories are calculated with the formula above, displayed as a calculated value, and labelled as such.
+- `Weight` never affects that calculation.
+- Selecting calculated calories opens a short explanation. The recommended primary action is `Keep calculated`; `Edit anyway` is secondary.
+- `Edit anyway` makes only calories manually editable. It must not auto-adjust weight or any macro, either immediately or after later macro edits.
+- `Use calculated calories` restores the macro formula while preserving the current weight and macro values.
 
-Within one open session:
-- any field the user edits manually becomes locked
-- any nutrition field can also be locked with a double tap, even before changing its value
-- locked fields get a yellow outline
-- locked fields show a small unlock icon
-- auto-calculation can change only unlocked fields
+This is intentionally a one-way Add Meal calculation model: macros may produce calories, but calories never produce grams or macros.
 
-Locks are not persisted across sheet openings.
+## Edit Meal
 
-When the user closes and reopens the sheet:
-- all locks reset
-- all session-only manual intent resets
+Editing an already saved meal deliberately preserves the existing values and uses the legacy session-scoped locking model. Existing numeric values are real values, not examples.
 
-## Realtime Recalculation Rules
+### Session-scoped locking
 
-### If the user edits `Weight`
+Each edit session begins when the sheet opens and ends when it closes.
 
-- scale unlocked `Calories`, `Protein`, `Fat`, `Carbs` proportionally
-- do not auto-change locked nutrition fields
-- do not derive a new `Weight` from anything else
+- A manually edited field becomes locked for that session.
+- A nutrition field may also be locked with a double tap before changing it.
+- Locked fields receive a yellow outline and an unlock icon.
+- Auto-calculation changes only unlocked values.
+- Locks and manual intent reset when the sheet is closed and reopened; they are not persisted.
 
-### If the user edits `Protein`, `Fat`, or `Carbs`
+The state keeps both `lockedFields` and `manuallyEditedMacroFields`:
 
-- the edited macro becomes locked
-- if `Calories` is not locked, recalculate `Calories` from macros
-- if `Calories` is already locked, do not overwrite `Calories`
-- if the new macro value causes a conflict with locked calories, keep the conflict state visible
+- `lockedFields` control the editor UI and which values auto-calculation may change.
+- `manuallyEditedMacroFields` records explicit macro edits for the locked-calories confirmation flow.
 
-### If the user edits `Calories`
+Double-tap locking does not count as a manual macro edit by itself.
 
-- `Calories` becomes locked
-- scale only unlocked macros proportionally to match the new calorie target
-- keep locked macros unchanged
-- if no valid rebalance is possible, keep the conflict visible instead of guessing
+### Recalculation rules
 
-## Manual Intent vs Locked Fields
+When editing a saved meal:
 
-The feature tracks both:
-- `lockedFields`
-- `manuallyEditedMacroFields`
+- Changing `Weight` proportionally scales only unlocked calories and macros. Weight is never derived from another value.
+- Changing protein, fat, or carbs locks that macro and recalculates calories when calories are not locked.
+- Changing calories locks calories and proportionally rebalances only unlocked macros where a valid rebalance is possible.
+- If valid rebalancing is impossible, the inconsistency remains visible instead of guessing.
 
-Why both exist:
-- `lockedFields` control current UI and auto-calc permissions
-- `manuallyEditedMacroFields` define which macro fields count as explicit user intent for locked-calories confirm logic
+### Locked-calories confirmation
 
-Double-tap locking adds a field to `lockedFields`, but does not count as a manual macro value change by itself.
+The confirmation appears only when calories are locked, the values conflict, and at least one other macro can safely be auto-adjusted.
 
-This distinction matters because confirm-flow must respect all manually edited macros in the current sheet session, not only the last edited macro.
+It offers:
 
-## Locked Calories Confirm Flow
+- `Save as entered`, which saves the current values unchanged.
+- `Auto-adjust & save`, which keeps calories and all manually fixed macros unchanged, and rebalances only the remaining allowed macros.
 
-Special confirm is shown only for this product case:
-- `Calories` is locked
-- there is a macro/calorie conflict
-- at least one other macro is still safe to auto-adjust
+If calories and all macros are manually fixed, no confirmation is shown. The user is asked to unlock a macro or recalculate from macros instead.
 
-Confirm copy:
-- title: `Keep calories fixed?`
-- body: `We’ll keep calories fixed and rebalance the other macros.`
-- secondary: `Save as entered`
-- primary: `Auto-adjust & save`
+### Edit-only actions
 
-### What confirm respects
+- `Recalculate from macros` clears edit-session locks and manual macro intent, calculates calories from the current macros, and leaves weight unchanged.
+- `Revert changes` returns the sheet to the exact snapshot captured when that edit session opened, including name, meal type, nutrition values, and lock state.
 
-When confirm is built, the following are treated as fixed:
-- locked `Calories`
-- all locked macro fields
-- all macro fields manually edited in the current sheet session
+Historical meal consistency uses a 15% calorie-vs-macro tolerance so small rounding differences do not force a recalculation.
 
-Only remaining unlocked and not-manually-edited macros may be rebalanced automatically.
+## Debug tracking
 
-### If the user taps `Save as entered`
+There is no external analytics SDK. Debug builds use `_trackMealEditEvent` and `debugPrint` for the legacy edit flow. If production analytics is added, this helper is the intended replacement point.
 
-- save immediately with the current entered values
-- keep the inconsistent nutrition values as-is
-- close the sheet
+## Test coverage
 
-### If the user taps `Auto-adjust & save`
+`test/widget_test.dart` covers, among other behavior:
 
-- rebalance only the remaining allowed macros
-- keep locked calories unchanged
-- keep all manually edited macros unchanged
-- save immediately
+- empty Add Meal placeholders and their focus behavior;
+- decimal keyboard configuration and in-field units;
+- Add Meal calculated calories, manual override, and restoration;
+- no auto-derived weight or macros in Add Meal;
+- time-based default meal type;
+- legacy Edit Meal locks, recalculation, conflict handling, recalculation, and revert behavior;
+- grouped-history edit save behavior.
 
-## Explicit Warning States
+## Refactor guidance
 
-### Fully manual macro state
-
-If `Calories` is locked and all macros are already manually fixed in the current session, confirm should not open.
-
-Show this message instead:
-
-```text
-All macros are manually locked. Unlock one macro or reset auto-calc to continue.
-```
-
-## Reset and Unlock UX
-
-### Unlock one field
-
-The field-level unlock icon:
-- removes the lock from that field
-- removes that macro from `manuallyEditedMacroFields` if applicable
-- immediately recalculates based on the remaining locked state
-
-### Reset auto-calc
-
-`Reset auto-calc`:
-- clears all locks
-- clears all session manual macro intent
-- recalculates `Calories` from the current macros
-- keeps `Weight` unchanged
-
-### Restore previous values
-
-`Restore previous values`:
-- returns the form to the exact state it had when the current sheet session opened
-- restores current nutrition values from session start
-- restores lock state from session start
-- restores the current sheet name and selected meal type from session start
-- clears any edits made after opening the sheet by replacing them with the original session snapshot
-
-## Analytics / Debug Tracking
-
-There is no external analytics SDK yet.
-
-Current lightweight tracking uses `debugPrint` in debug mode through `_trackMealEditEvent`.
-
-Tracked events:
-- `meal_edit_locked_conflict_prompt_shown`
-- `meal_edit_locked_conflict_save_as_entered`
-- `meal_edit_locked_conflict_auto_adjust_saved`
-- `meal_edit_locked_conflict_unresolvable`
-- `meal_edit_reset_auto_calc`
-- `meal_edit_unlock_field`
-
-Current payload fields may include:
-- `source` (`add` or `edit`)
-- `locked_fields_count`
-- `manually_edited_macro_count`
-- `adjusted_fields`
-- `has_conflict`
-
-If the team later adds a real analytics SDK, this helper is the intended replacement point.
-
-## Test Coverage
-
-Widget coverage currently includes:
-- `Weight -> unlocked nutrition values`
-- `Macro -> Calories`
-- `Calories -> unlocked macros`
-- yellow locked styling + unlock icon
-- unlock recalculation
-- reset auto-calc behavior
-- locked-calories confirm flow
-- confirm respecting multiple manual macro edits in one session
-- fully manual macro conflict without confirm
-- grouped-history edit path save behavior
-
-Main test file:
-- `test/widget_test.dart`
-
-## Refactor Guidance
-
-Current implementation is acceptable for the present app size because:
-- the feature is private to one screen
-- behavior is heavily covered by widget tests
-- product rules changed rapidly during implementation
-
-Current extracted logic:
-- `_MealEditField`
-- `_MealLockedCaloriesAutoAdjustProposal`
-- `_MealFormDraft`
-- `_mealCaloriesFromMacros`
-
-Current location:
-- `lib/meal_edit_draft.dart` as a `part` of `lib/main.dart`
-
-Suggested future modularization target:
-- `lib/meal_edit/meal_form_draft.dart`
-- or a small `lib/meal_edit/` folder if the screen continues growing
-
-Do this when one of these becomes true:
-- more nutrition editing screens are added
-- validation/copy needs localization
-- analytics becomes production-grade
-- `lib/main.dart` becomes meaningfully harder to navigate
-
-Until then, avoid refactoring just for file-count cleanliness if it risks destabilizing the math.
+The current implementation is suitable for the present app size because it is private to one screen and covered by widget tests. Keep the separated Add Meal and Edit Meal contracts intact. Move the draft logic into a dedicated `lib/meal_edit/` folder only if more nutrition-editing surfaces are added or `lib/main.dart` becomes meaningfully hard to navigate.

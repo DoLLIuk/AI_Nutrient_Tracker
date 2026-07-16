@@ -1582,7 +1582,7 @@ void main() {
 
       final calories = tester.widget<TextField>(input('calories'));
       expect(calories.controller!.text, isEmpty);
-      expect(calories.decoration?.hintText, 'Enter all macros first');
+      expect(calories.decoration?.hintText, 'Auto-calculated from macros');
       expect(calories.readOnly, isTrue);
 
       for (final suffix in ['weight', 'protein', 'fat', 'carbs']) {
@@ -1610,7 +1610,7 @@ void main() {
       expect(find.byKey(const Key('calorie-calculated-badge')), findsOneWidget);
       expect(
         tester.widget<TextField>(input('calories')).controller!.text,
-        '200.0',
+        '200',
       );
       expect(tester.widget<TextField>(input('calories')).readOnly, isTrue);
 
@@ -1621,17 +1621,32 @@ void main() {
         find.byKey(const Key('calorie-calculated-dialog')),
         findsOneWidget,
       );
+      expect(
+        tester.widget<FilledButton>(
+          find.byKey(const Key('calorie-override-keep')),
+        ),
+        isA<FilledButton>(),
+      );
+      expect(
+        tester.widget<OutlinedButton>(
+          find.byKey(const Key('calorie-override-edit')),
+        ),
+        isA<OutlinedButton>(),
+      );
+      expect(
+        find.text(
+          'Calculated from protein × 4, fat × 9 and carbs × 4. Usually accurate — edit only if you know the exact recipe.',
+        ),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const Key('calorie-override-edit')));
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(input('calories')).readOnly, isFalse);
       await tester.enterText(input('calories'), '225');
       await tester.pump();
-      expect(
-        tester.widget<TextField>(input('protein')).controller!.text,
-        '20.0',
-      );
-      expect(tester.widget<TextField>(input('fat')).controller!.text, '0.0');
-      expect(tester.widget<TextField>(input('carbs')).controller!.text, '30.0');
+      expect(tester.widget<TextField>(input('protein')).controller!.text, '20');
+      expect(tester.widget<TextField>(input('fat')).controller!.text, '0');
+      expect(tester.widget<TextField>(input('carbs')).controller!.text, '30');
     },
   );
   testWidgets('editing meal protein saves manual macro override', (
@@ -1783,10 +1798,10 @@ void main() {
     await tester.tap(find.text('Edit'));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('reset-auto-calc')), findsOneWidget);
+    expect(find.byKey(const Key('recalculate-from-macros')), findsOneWidget);
     expect(
       find.text(
-        'This meal has inconsistent nutrition values. Reset auto-calc to normalize it.',
+        'This meal has inconsistent nutrition values. Recalculate from macros to normalize it.',
       ),
       findsOneWidget,
     );
@@ -1843,7 +1858,7 @@ void main() {
       await tester.tap(find.text('Edit'));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('reset-auto-calc')), findsNothing);
+      expect(find.byKey(const Key('recalculate-from-macros')), findsNothing);
       expect(find.byKey(const Key('meal-form-message')), findsNothing);
     },
   );
@@ -1969,9 +1984,7 @@ void main() {
     expect(find.text('Fat: 11.4 g'), findsOneWidget);
     expect(find.text('Carbs: 34.3 g'), findsOneWidget);
   });
-  testWidgets('locked field shows yellow outline and unlock icon', (
-    tester,
-  ) async {
+  testWidgets('Add Meal fields have units and no legacy locks', (tester) async {
     final controller = PhotoFoodController(
       repository: _FakeRepository(),
       photoPicker: _FakePicker(file: null),
@@ -1989,13 +2002,23 @@ void main() {
     await _enterManualMealValue(tester, 'protein', '40');
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('meal-lock-protein')), findsOneWidget);
-    final proteinContainer = tester.widget<Container>(
-      find.byKey(const Key('meal-input-protein')),
+    expect(find.byKey(const Key('meal-lock-protein')), findsNothing);
+    expect(find.text('Weight (g)'), findsNothing);
+    expect(find.text('Protein (g)'), findsNothing);
+    expect(
+      tester.widget<TextField>(_mealInput('protein')).decoration?.suffixText,
+      'g',
     );
-    final decoration = proteinContainer.decoration! as BoxDecoration;
-    final border = decoration.border! as Border;
-    expect(border.top.color, const Color(0xFFFACC15));
+    expect(
+      tester.widget<TextField>(_mealInput('calories')).decoration?.hintText,
+      'Auto-calculated from macros',
+    );
+    for (final field in ['weight', 'protein', 'fat', 'carbs', 'calories']) {
+      expect(
+        tester.widget<TextField>(_mealInput(field)).keyboardType,
+        const TextInputType.numberWithOptions(decimal: true),
+      );
+    }
   });
   testWidgets('double tap locks meal field without changing its value', (
     tester,
@@ -2048,7 +2071,7 @@ void main() {
         .elementAt(3);
     expect(proteinTextField.controller?.text, '25.0');
   });
-  testWidgets('unlocking calories immediately recalculates them from macros', (
+  testWidgets('Add Meal does not expose legacy nutrition locks', (
     tester,
   ) async {
     final controller = PhotoFoodController(
@@ -2069,20 +2092,16 @@ void main() {
     await _enterManualMealValue(tester, 'protein', '25');
     await _enterManualMealValue(tester, 'fat', '10');
     await _enterManualMealValue(tester, 'carbs', '30');
-    await tester.tap(_mealInput('calories'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('calorie-override-edit')));
-    await tester.pumpAndSettle();
-    await _enterManualMealValue(tester, 'calories', '400');
-    await _enterManualMealValue(tester, 'protein', '40');
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('meal-lock-calories')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('meal-lock-calories')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('meal-lock-calories')), findsNothing);
-    expect(find.text('370.0'), findsOneWidget);
+    expect(find.byKey(const Key('meal-lock-protein')), findsNothing);
+    expect(find.byKey(const Key('meal-lock-fat')), findsNothing);
+    expect(find.byKey(const Key('meal-lock-carbs')), findsNothing);
+    expect(
+      tester.widget<TextField>(_mealInput('calories')).controller?.text,
+      '310',
+    );
   });
   testWidgets('locked protein stays fixed when calories are edited later', (
     tester,
@@ -2107,6 +2126,9 @@ void main() {
     await _enterManualMealValue(tester, 'protein', '25');
     await _enterManualMealValue(tester, 'fat', '10');
     await _enterManualMealValue(tester, 'carbs', '30');
+    await tester.pump();
+    expect(find.byKey(const Key('calorie-calculated-badge')), findsOneWidget);
+    await tester.ensureVisible(_mealInput('calories'));
     await tester.tap(_mealInput('calories'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('calorie-override-edit')));
@@ -2285,7 +2307,7 @@ void main() {
     expect(find.text('Fat: 8.4 g'), findsOneWidget);
     expect(find.text('Carbs: 60.0 g'), findsOneWidget);
   });
-  testWidgets('unlocking protein lets auto-calc rebalance it again', (
+  testWidgets('manual Add Meal calories never rebalance macros', (
     tester,
   ) async {
     final controller = PhotoFoodController(
@@ -2306,6 +2328,8 @@ void main() {
     await _enterManualMealValue(tester, 'protein', '40');
     await _enterManualMealValue(tester, 'fat', '20');
     await _enterManualMealValue(tester, 'carbs', '50');
+    await tester.pump();
+    await tester.ensureVisible(_mealInput('calories'));
     await tester.tap(_mealInput('calories'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('calorie-override-edit')));
@@ -2314,23 +2338,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('meal-form-message')), findsNothing);
-    expect(find.byKey(const Key('meal-lock-protein')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('meal-lock-protein')));
-    await tester.pumpAndSettle();
-
     expect(find.byKey(const Key('meal-lock-protein')), findsNothing);
-    expect(find.text('5.0'), findsOneWidget);
     expect(
-      find.text(
-        'All macros are manually locked. Unlock one macro or reset auto-calc to continue.',
-      ),
-      findsNothing,
+      tester.widget<TextField>(_mealInput('protein')).controller?.text,
+      '40',
     );
+    expect(tester.widget<TextField>(_mealInput('fat')).controller?.text, '20');
     expect(
-      find.text(
-        'This field can’t be auto-adjusted because other nutrition values were edited manually.',
-      ),
-      findsNothing,
+      tester.widget<TextField>(_mealInput('carbs')).controller?.text,
+      '50',
     );
   });
   testWidgets('locked protein remains unchanged when weight changes later', (
@@ -2382,7 +2398,7 @@ void main() {
     expect(find.text('Carbs: 60.0 g'), findsOneWidget);
     expect(find.text('Calories: 580.0 kcal'), findsOneWidget);
   });
-  testWidgets('reset auto calc clears locks and recalculates calories', (
+  testWidgets('manual calorie override can return to calculated calories', (
     tester,
   ) async {
     final controller = PhotoFoodController(
@@ -2403,6 +2419,8 @@ void main() {
     await _enterManualMealValue(tester, 'protein', '25');
     await _enterManualMealValue(tester, 'fat', '10');
     await _enterManualMealValue(tester, 'carbs', '30');
+    await tester.pump();
+    await tester.ensureVisible(_mealInput('calories'));
     await tester.tap(_mealInput('calories'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('calorie-override-edit')));
@@ -2411,16 +2429,37 @@ void main() {
     await _enterManualMealValue(tester, 'protein', '40');
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('reset-auto-calc')), findsOneWidget);
-    await tester.ensureVisible(find.byKey(const Key('reset-auto-calc')));
-    await tester.tap(find.byKey(const Key('reset-auto-calc')));
+    expect(find.byKey(const Key('reset-auto-calc')), findsNothing);
+    expect(find.byKey(const Key('recalculate-from-macros')), findsNothing);
+    expect(find.byKey(const Key('revert-changes')), findsNothing);
+    expect(find.byKey(const Key('use-calculated-calories')), findsOneWidget);
+    await tester.ensureVisible(
+      find.byKey(const Key('use-calculated-calories')),
+    );
+    await tester.tap(find.byKey(const Key('use-calculated-calories')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('reset-auto-calc')), findsNothing);
+    expect(find.byKey(const Key('use-calculated-calories')), findsNothing);
+    expect(find.byKey(const Key('calorie-calculated-badge')), findsOneWidget);
     expect(find.byKey(const Key('meal-lock-calories')), findsNothing);
-    expect(find.byKey(const Key('meal-lock-protein')), findsNothing);
     expect(find.byKey(const Key('meal-form-message')), findsNothing);
-    expect(find.text('370.0'), findsOneWidget);
+    expect(
+      tester.widget<TextField>(_mealInput('calories')).controller?.text,
+      '370',
+    );
+    expect(
+      tester.widget<TextField>(_mealInput('weight')).controller?.text,
+      '250',
+    );
+    expect(
+      tester.widget<TextField>(_mealInput('protein')).controller?.text,
+      '40',
+    );
+    expect(tester.widget<TextField>(_mealInput('fat')).controller?.text, '10');
+    expect(
+      tester.widget<TextField>(_mealInput('carbs')).controller?.text,
+      '30',
+    );
   });
   testWidgets('restore start values returns edit session to initial state', (
     tester,
@@ -2461,9 +2500,9 @@ void main() {
     await tester.enterText(editFields.at(3), '40');
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('restore-session-start')), findsOneWidget);
-    await tester.ensureVisible(find.byKey(const Key('restore-session-start')));
-    await tester.tap(find.byKey(const Key('restore-session-start')));
+    expect(find.byKey(const Key('revert-changes')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('revert-changes')));
+    await tester.tap(find.byKey(const Key('revert-changes')));
     await tester.pumpAndSettle();
 
     final restoredFields = tester
@@ -2477,7 +2516,7 @@ void main() {
     expect(restoredFields[5].controller?.text, '30.0');
     expect(find.byKey(const Key('meal-lock-calories')), findsNothing);
     expect(find.byKey(const Key('meal-lock-protein')), findsNothing);
-    expect(find.byKey(const Key('restore-session-start')), findsNothing);
+    expect(find.byKey(const Key('revert-changes')), findsNothing);
   });
   testWidgets('conflicting locked nutrition values show form error', (
     tester,
@@ -2505,6 +2544,8 @@ void main() {
     await _enterManualMealValue(tester, 'protein', '40');
     await _enterManualMealValue(tester, 'fat', '20');
     await _enterManualMealValue(tester, 'carbs', '50');
+    await tester.pump();
+    await tester.ensureVisible(_mealInput('calories'));
     await tester.tap(_mealInput('calories'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('calorie-override-edit')));
@@ -2547,6 +2588,46 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('meal-type-lunch')));
     await tester.tap(find.byKey(const Key('meal-type-lunch')));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('manual Add Meal defaults to the current time meal type', (
+    tester,
+  ) async {
+    final controller = PhotoFoodController(
+      repository: _FakeRepository(),
+      photoPicker: _FakePicker(file: null),
+    );
+
+    await tester.pumpWidget(
+      MyApp(
+        controller: controller,
+        skipOnboarding: true,
+        nowProvider: () => DateTime(2026, 4, 2, 13, 0),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('fab-add')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('add-manual')));
+    await tester.pumpAndSettle();
+
+    final lunchTile = tester.widget<AnimatedContainer>(
+      find.descendant(
+        of: find.byKey(const Key('meal-type-lunch')),
+        matching: find.byType(AnimatedContainer),
+      ),
+    );
+    final breakfastTile = tester.widget<AnimatedContainer>(
+      find.descendant(
+        of: find.byKey(const Key('meal-type-breakfast')),
+        matching: find.byType(AnimatedContainer),
+      ),
+    );
+    expect(
+      (lunchTile.decoration! as BoxDecoration).color,
+      const Color(0xFFEFF4FF),
+    );
+    expect((breakfastTile.decoration! as BoxDecoration).color, Colors.white);
   });
 
   testWidgets('manual meal submit stays visible on a compact screen', (

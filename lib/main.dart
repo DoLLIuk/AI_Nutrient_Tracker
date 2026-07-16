@@ -1025,7 +1025,12 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
         if (editingMeal == null && controller.text.isEmpty && value == 0) {
           return;
         }
-        updateControllerText(controller, value.toStringAsFixed(1));
+        updateControllerText(
+          controller,
+          editingMeal == null
+              ? _formatMealSheetNumber(value)
+              : value.toStringAsFixed(1),
+        );
       }
 
       syncNumericController(
@@ -1096,7 +1101,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Based on protein × 4, carbs × 4 and fat × 9. It’s the best estimate from your macros; editing is not recommended.',
+                  'Calculated from protein × 4, fat × 9 and carbs × 4. Usually accurate — edit only if you know the exact recipe.',
                   style: TextStyle(
                     fontSize: 14,
                     height: 1.35,
@@ -1107,7 +1112,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
+                      child: FilledButton(
                         key: const Key('calorie-override-keep'),
                         onPressed: () => Navigator.of(dialogContext).pop(false),
                         child: const Text('Keep calculated'),
@@ -1115,7 +1120,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: FilledButton(
+                      child: OutlinedButton(
                         key: const Key('calorie-override-edit'),
                         onPressed: () => Navigator.of(dialogContext).pop(true),
                         child: const Text('Edit anyway'),
@@ -1162,12 +1167,15 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       if (editingMeal == null && isMacroField(field)) {
         manuallyEnteredMacroFields.add(field);
       }
-      formDraft =
-          editingMeal == null &&
-              field == _MealEditField.calories &&
-              formDraft.isManualCalorieOverride
-          ? formDraft.applyManualCalorieOverride(parsedValue)
-          : formDraft.applyUserEdit(field, parsedValue);
+      if (editingMeal == null) {
+        formDraft =
+            field == _MealEditField.calories &&
+                formDraft.isManualCalorieOverride
+            ? formDraft.applyManualCalorieOverride(parsedValue)
+            : formDraft.applyAddMealEdit(field, parsedValue);
+      } else {
+        formDraft = formDraft.applyUserEdit(field, parsedValue);
+      }
       syncControllersFromDraft(preserveField: field);
       setSheetState(() {
         formMessage = formDraft.inlineMessage;
@@ -1219,6 +1227,21 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       });
       setSheetState(() {
         formMessage = formDraft.inlineMessage;
+      });
+    }
+
+    void useCalculatedCalories(StateSetter setSheetState) {
+      if (editingMeal != null || !hasAllManualMacros()) return;
+      formDraft = formDraft.useCalculatedCalories();
+      syncControllersFromDraft();
+      _trackMealEditEvent('meal_edit_use_calculated_calories', {
+        'source': mealEditSource,
+        'locked_fields_count': formDraft.lockedFields.length,
+        'manually_edited_macro_count':
+            formDraft.manuallyEditedMacroFields.length,
+      });
+      setSheetState(() {
+        formMessage = null;
       });
     }
 
@@ -1384,6 +1407,14 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
               final showCalculatedCalories = caloriesAreCalculated();
               final caloriesAwaitMacros =
                   editingMeal == null && !hasAllManualMacros();
+              final showUseCalculatedCalories =
+                  editingMeal == null &&
+                  formDraft.isManualCalorieOverride &&
+                  hasAllManualMacros();
+              final showEditRecalculate =
+                  editingMeal != null && formDraft.shouldShowResetAutoCalc;
+              final showEditRevert =
+                  editingMeal != null && hasSessionRestoreChanges();
               Widget caloriesInput() => _sheetInput(
                 controller: kcalCtrl,
                 fieldKeySuffix: 'calories',
@@ -1392,7 +1423,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                     ? const _CalculatedFieldBadge()
                     : null,
                 hint: caloriesAwaitMacros
-                    ? 'Enter all macros first'
+                    ? 'Auto-calculated from macros'
                     : numericHint(
                         _MealEditField.calories,
                         editingMeal?.kcal,
@@ -1404,11 +1435,16 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                     : () => dismissExampleHint(_MealEditField.calories),
                 onFocus: () => dismissExampleHint(_MealEditField.calories),
                 numeric: true,
-                isLocked: formDraft.isLocked(_MealEditField.calories),
-                onDoubleTapLock: () =>
-                    lockField(_MealEditField.calories, setSheetState),
-                onUnlock: () =>
-                    unlockField(_MealEditField.calories, setSheetState),
+                suffixText: 'kcal',
+                isLocked:
+                    editingMeal != null &&
+                    formDraft.isLocked(_MealEditField.calories),
+                onDoubleTapLock: editingMeal == null
+                    ? null
+                    : () => lockField(_MealEditField.calories, setSheetState),
+                onUnlock: editingMeal == null
+                    ? null
+                    : () => unlockField(_MealEditField.calories, setSheetState),
                 onChanged: (value) => handleFieldChanged(
                   _MealEditField.calories,
                   value,
@@ -1467,7 +1503,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                     child: _sheetInput(
                                       controller: gramsCtrl,
                                       fieldKeySuffix: 'weight',
-                                      label: 'Weight (g)',
+                                      label: 'Weight',
                                       hint: numericHint(
                                         _MealEditField.weight,
                                         editingMeal?.portionG,
@@ -1480,17 +1516,24 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                         _MealEditField.weight,
                                       ),
                                       numeric: true,
-                                      isLocked: formDraft.isLocked(
-                                        _MealEditField.weight,
-                                      ),
-                                      onDoubleTapLock: () => lockField(
-                                        _MealEditField.weight,
-                                        setSheetState,
-                                      ),
-                                      onUnlock: () => unlockField(
-                                        _MealEditField.weight,
-                                        setSheetState,
-                                      ),
+                                      suffixText: 'g',
+                                      isLocked:
+                                          editingMeal != null &&
+                                          formDraft.isLocked(
+                                            _MealEditField.weight,
+                                          ),
+                                      onDoubleTapLock: editingMeal == null
+                                          ? null
+                                          : () => lockField(
+                                              _MealEditField.weight,
+                                              setSheetState,
+                                            ),
+                                      onUnlock: editingMeal == null
+                                          ? null
+                                          : () => unlockField(
+                                              _MealEditField.weight,
+                                              setSheetState,
+                                            ),
                                       onChanged: (value) => handleFieldChanged(
                                         _MealEditField.weight,
                                         value,
@@ -1503,7 +1546,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                     child: _sheetInput(
                                       controller: proteinCtrl,
                                       fieldKeySuffix: 'protein',
-                                      label: 'Protein (g)',
+                                      label: 'Protein',
                                       hint: numericHint(
                                         _MealEditField.protein,
                                         editingMeal?.proteinG,
@@ -1516,17 +1559,24 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                         _MealEditField.protein,
                                       ),
                                       numeric: true,
-                                      isLocked: formDraft.isLocked(
-                                        _MealEditField.protein,
-                                      ),
-                                      onDoubleTapLock: () => lockField(
-                                        _MealEditField.protein,
-                                        setSheetState,
-                                      ),
-                                      onUnlock: () => unlockField(
-                                        _MealEditField.protein,
-                                        setSheetState,
-                                      ),
+                                      suffixText: 'g',
+                                      isLocked:
+                                          editingMeal != null &&
+                                          formDraft.isLocked(
+                                            _MealEditField.protein,
+                                          ),
+                                      onDoubleTapLock: editingMeal == null
+                                          ? null
+                                          : () => lockField(
+                                              _MealEditField.protein,
+                                              setSheetState,
+                                            ),
+                                      onUnlock: editingMeal == null
+                                          ? null
+                                          : () => unlockField(
+                                              _MealEditField.protein,
+                                              setSheetState,
+                                            ),
                                       onChanged: (value) => handleFieldChanged(
                                         _MealEditField.protein,
                                         value,
@@ -1543,7 +1593,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                     child: _sheetInput(
                                       controller: fatCtrl,
                                       fieldKeySuffix: 'fat',
-                                      label: 'Fat (g)',
+                                      label: 'Fat',
                                       hint: numericHint(
                                         _MealEditField.fat,
                                         editingMeal?.fatG,
@@ -1556,17 +1606,24 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                         _MealEditField.fat,
                                       ),
                                       numeric: true,
-                                      isLocked: formDraft.isLocked(
-                                        _MealEditField.fat,
-                                      ),
-                                      onDoubleTapLock: () => lockField(
-                                        _MealEditField.fat,
-                                        setSheetState,
-                                      ),
-                                      onUnlock: () => unlockField(
-                                        _MealEditField.fat,
-                                        setSheetState,
-                                      ),
+                                      suffixText: 'g',
+                                      isLocked:
+                                          editingMeal != null &&
+                                          formDraft.isLocked(
+                                            _MealEditField.fat,
+                                          ),
+                                      onDoubleTapLock: editingMeal == null
+                                          ? null
+                                          : () => lockField(
+                                              _MealEditField.fat,
+                                              setSheetState,
+                                            ),
+                                      onUnlock: editingMeal == null
+                                          ? null
+                                          : () => unlockField(
+                                              _MealEditField.fat,
+                                              setSheetState,
+                                            ),
                                       onChanged: (value) => handleFieldChanged(
                                         _MealEditField.fat,
                                         value,
@@ -1579,7 +1636,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                     child: _sheetInput(
                                       controller: carbsCtrl,
                                       fieldKeySuffix: 'carbs',
-                                      label: 'Carbs (g)',
+                                      label: 'Carbs',
                                       hint: numericHint(
                                         _MealEditField.carbs,
                                         editingMeal?.carbsG,
@@ -1592,17 +1649,24 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                         _MealEditField.carbs,
                                       ),
                                       numeric: true,
-                                      isLocked: formDraft.isLocked(
-                                        _MealEditField.carbs,
-                                      ),
-                                      onDoubleTapLock: () => lockField(
-                                        _MealEditField.carbs,
-                                        setSheetState,
-                                      ),
-                                      onUnlock: () => unlockField(
-                                        _MealEditField.carbs,
-                                        setSheetState,
-                                      ),
+                                      suffixText: 'g',
+                                      isLocked:
+                                          editingMeal != null &&
+                                          formDraft.isLocked(
+                                            _MealEditField.carbs,
+                                          ),
+                                      onDoubleTapLock: editingMeal == null
+                                          ? null
+                                          : () => lockField(
+                                              _MealEditField.carbs,
+                                              setSheetState,
+                                            ),
+                                      onUnlock: editingMeal == null
+                                          ? null
+                                          : () => unlockField(
+                                              _MealEditField.carbs,
+                                              setSheetState,
+                                            ),
                                       onChanged: (value) => handleFieldChanged(
                                         _MealEditField.carbs,
                                         value,
@@ -1615,8 +1679,45 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                               if (editingMeal == null) ...[
                                 const SizedBox(height: 12),
                                 caloriesInput(),
+                                if (showUseCalculatedCalories) ...[
+                                  const SizedBox(height: 8),
+                                  Align(
+                                    alignment: Alignment.center,
+                                    child: TextButton.icon(
+                                      key: const Key('use-calculated-calories'),
+                                      onPressed: () =>
+                                          useCalculatedCalories(setSheetState),
+                                      icon: const Icon(
+                                        Icons.auto_awesome_rounded,
+                                        size: 17,
+                                      ),
+                                      label: const Text(
+                                        'Use calculated calories',
+                                      ),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: const Color(
+                                          0xFF2856C8,
+                                        ),
+                                        backgroundColor: const Color(
+                                          0xFFEAF0FF,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
-                              const SizedBox(height: 14),
+                              SizedBox(
+                                height: showUseCalculatedCalories ? 4 : 14,
+                              ),
                               const Text(
                                 'Meal Type',
                                 style: TextStyle(
@@ -1683,18 +1784,19 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                   ),
                                 ],
                               ),
-                              if (formDraft.shouldShowResetAutoCalc ||
-                                  hasSessionRestoreChanges()) ...[
+                              if (showEditRecalculate || showEditRevert) ...[
                                 const SizedBox(height: 12),
                                 IntrinsicHeight(
                                   child: Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.stretch,
                                     children: [
-                                      if (formDraft.shouldShowResetAutoCalc)
+                                      if (showEditRecalculate)
                                         Expanded(
                                           child: TextButton.icon(
-                                            key: const Key('reset-auto-calc'),
+                                            key: const Key(
+                                              'recalculate-from-macros',
+                                            ),
                                             onPressed: () =>
                                                 resetAutoCalc(setSheetState),
                                             icon: const Icon(
@@ -1702,7 +1804,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                               size: 18,
                                             ),
                                             label: const Text(
-                                              'Reset auto‑calc',
+                                              'Recalculate from macros',
                                               textAlign: TextAlign.center,
                                             ),
                                             style: TextButton.styleFrom(
@@ -1725,15 +1827,12 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                             ),
                                           ),
                                         ),
-                                      if (formDraft.shouldShowResetAutoCalc &&
-                                          hasSessionRestoreChanges())
+                                      if (showEditRecalculate && showEditRevert)
                                         const SizedBox(width: 10),
-                                      if (hasSessionRestoreChanges())
+                                      if (showEditRevert)
                                         Expanded(
                                           child: TextButton.icon(
-                                            key: const Key(
-                                              'restore-session-start',
-                                            ),
+                                            key: const Key('revert-changes'),
                                             onPressed: () =>
                                                 restoreSessionStart(
                                                   setSheetState,
@@ -1743,7 +1842,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                               size: 18,
                                             ),
                                             label: const Text(
-                                              'Restore previous values',
+                                              'Revert changes',
                                               textAlign: TextAlign.center,
                                             ),
                                             style: TextButton.styleFrom(
@@ -1969,6 +2068,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     required String label,
     required String hint,
     String? fieldKeySuffix,
+    String? suffixText,
     bool numeric = false,
     bool readOnly = false,
     bool isLocked = false,
@@ -2030,6 +2130,12 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                           : TextInputType.text,
                       decoration: InputDecoration(
                         hintText: hint,
+                        suffixText: suffixText,
+                        suffixStyle: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF64748B),
+                        ),
                         filled: true,
                         fillColor: Colors.transparent,
                         contentPadding: EdgeInsets.fromLTRB(

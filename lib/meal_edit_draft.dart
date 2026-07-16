@@ -28,7 +28,7 @@ class _MealFormDraft {
   static const String conflictMessage =
       'This field can’t be auto-adjusted because other nutrition values were edited manually.';
   static const String existingInconsistencyMessage =
-      'This meal has inconsistent nutrition values. Reset auto-calc to normalize it.';
+      'This meal has inconsistent nutrition values. Recalculate from macros to normalize it.';
   static const double _existingConsistencyToleranceRatio = 0.15;
   static const String allMacrosLockedMessage =
       'All macros are manually locked. Unlock one macro or reset auto-calc to continue.';
@@ -182,20 +182,42 @@ class _MealFormDraft {
     return next;
   }
 
+  _MealFormDraft applyAddMealEdit(_MealEditField field, double value) {
+    final next = copyWith(
+      clearError: true,
+      lastEditedField: field,
+    )._withFieldValue(field, value);
+
+    if (next.isManualCalorieOverride) return next;
+    if (_macroFields.contains(field)) return next._syncCaloriesToMacros();
+
+    // Weight is user-provided context in a new meal. It must never scale or
+    // infer the macro amounts because there is no reliable basis to do so.
+    return next;
+  }
+
   _MealFormDraft enableManualCalorieOverride() {
     return copyWith(isManualCalorieOverride: true, clearError: true);
   }
 
   _MealFormDraft applyManualCalorieOverride(double value) {
-    final nextLockedFields = Set<_MealEditField>.from(lockedFields)
-      ..add(_MealEditField.calories);
     return copyWith(
       kcal: value,
-      lockedFields: nextLockedFields,
       isManualCalorieOverride: true,
       clearError: true,
       lastEditedField: _MealEditField.calories,
     );
+  }
+
+  _MealFormDraft useCalculatedCalories() {
+    final nextLockedFields = Set<_MealEditField>.from(lockedFields)
+      ..remove(_MealEditField.calories);
+    return copyWith(
+      lockedFields: nextLockedFields,
+      isManualCalorieOverride: false,
+      clearError: true,
+      clearLastEditedField: lastEditedField == _MealEditField.calories,
+    )._syncCaloriesToMacros();
   }
 
   _MealFormDraft lockField(_MealEditField field) {
