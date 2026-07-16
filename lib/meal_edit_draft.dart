@@ -48,6 +48,7 @@ class _MealFormDraft {
   final double carbsG;
   final Set<_MealEditField> lockedFields;
   final Set<_MealEditField> manuallyEditedMacroFields;
+  final bool isManualCalorieOverride;
   final String? errorMessage;
   final _MealEditField? lastEditedField;
 
@@ -59,6 +60,7 @@ class _MealFormDraft {
     required this.carbsG,
     required this.lockedFields,
     required this.manuallyEditedMacroFields,
+    this.isManualCalorieOverride = false,
     this.errorMessage,
     this.lastEditedField,
   });
@@ -72,6 +74,7 @@ class _MealFormDraft {
       carbsG: meal?.carbsG ?? 0,
       lockedFields: const <_MealEditField>{},
       manuallyEditedMacroFields: const <_MealEditField>{},
+      isManualCalorieOverride: false,
       lastEditedField: null,
     )._validateExistingConsistency();
   }
@@ -84,6 +87,7 @@ class _MealFormDraft {
     double? carbsG,
     Set<_MealEditField>? lockedFields,
     Set<_MealEditField>? manuallyEditedMacroFields,
+    bool? isManualCalorieOverride,
     String? errorMessage,
     _MealEditField? lastEditedField,
     bool clearError = false,
@@ -98,6 +102,8 @@ class _MealFormDraft {
       lockedFields: lockedFields ?? this.lockedFields,
       manuallyEditedMacroFields:
           manuallyEditedMacroFields ?? this.manuallyEditedMacroFields,
+      isManualCalorieOverride:
+          isManualCalorieOverride ?? this.isManualCalorieOverride,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       lastEditedField: clearLastEditedField
           ? null
@@ -115,6 +121,7 @@ class _MealFormDraft {
         carbsG == other.carbsG &&
         setEquals(lockedFields, other.lockedFields) &&
         setEquals(manuallyEditedMacroFields, other.manuallyEditedMacroFields) &&
+        isManualCalorieOverride == other.isManualCalorieOverride &&
         errorMessage == other.errorMessage &&
         lastEditedField == other.lastEditedField;
   }
@@ -158,6 +165,10 @@ class _MealFormDraft {
       lastEditedField: field,
     )._withFieldValue(field, value);
 
+    if (next.isManualCalorieOverride) {
+      return next;
+    }
+
     if (field == _MealEditField.weight) {
       next = next._applyWeightChange(previousWeight: grams);
     } else if (field == _MealEditField.calories) {
@@ -169,6 +180,22 @@ class _MealFormDraft {
     }
 
     return next;
+  }
+
+  _MealFormDraft enableManualCalorieOverride() {
+    return copyWith(isManualCalorieOverride: true, clearError: true);
+  }
+
+  _MealFormDraft applyManualCalorieOverride(double value) {
+    final nextLockedFields = Set<_MealEditField>.from(lockedFields)
+      ..add(_MealEditField.calories);
+    return copyWith(
+      kcal: value,
+      lockedFields: nextLockedFields,
+      isManualCalorieOverride: true,
+      clearError: true,
+      lastEditedField: _MealEditField.calories,
+    );
   }
 
   _MealFormDraft lockField(_MealEditField field) {
@@ -202,6 +229,7 @@ class _MealFormDraft {
     return copyWith(
       lockedFields: <_MealEditField>{},
       manuallyEditedMacroFields: <_MealEditField>{},
+      isManualCalorieOverride: false,
       clearError: true,
       clearLastEditedField: true,
     )._syncCaloriesToMacros();

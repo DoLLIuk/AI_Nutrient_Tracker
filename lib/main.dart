@@ -943,6 +943,13 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     final carbsCtrl = TextEditingController(
       text: editingMeal == null ? '' : editingMeal.carbsG.toStringAsFixed(1),
     );
+    final dismissedExampleHints = <_MealEditField>{};
+    StateSetter? updateExampleHints;
+    void dismissExampleHint(_MealEditField field) {
+      if (editingMeal != null || !dismissedExampleHints.add(field)) return;
+      updateExampleHints?.call(() {});
+    }
+
     var selectedMealType =
         editingMeal?.userSelectedType ??
         editingMeal?.finalType ??
@@ -953,11 +960,42 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     final initialMealName = nameCtrl.text;
     String? formMessage = formDraft.inlineMessage;
     var isApplyingDraft = false;
+    final manuallyEnteredMacroFields = <_MealEditField>{};
+    var isShowingCalculatedCaloriesDialog = false;
     final mealEditSource = editingMeal == null ? 'add' : 'edit';
 
-    String numericHint(double? originalValue, String fallback) {
-      if (editingMeal == null || originalValue == null) return fallback;
-      return _formatMealSheetNumber(originalValue);
+    bool isMacroField(_MealEditField field) {
+      return field == _MealEditField.protein ||
+          field == _MealEditField.fat ||
+          field == _MealEditField.carbs;
+    }
+
+    bool hasAllManualMacros() {
+      return manuallyEnteredMacroFields.containsAll(const <_MealEditField>{
+        _MealEditField.protein,
+        _MealEditField.fat,
+        _MealEditField.carbs,
+      });
+    }
+
+    bool caloriesAreCalculated() {
+      return editingMeal == null &&
+          hasAllManualMacros() &&
+          !formDraft.isManualCalorieOverride;
+    }
+
+    String numericHint(
+      _MealEditField field,
+      double? originalValue,
+      String example,
+    ) {
+      if (editingMeal != null && originalValue != null) {
+        return _formatMealSheetNumber(originalValue);
+      }
+      if (editingMeal == null && dismissedExampleHints.contains(field)) {
+        return '';
+      }
+      return 'e.g. $example';
     }
 
     void updateControllerText(TextEditingController controller, String text) {
@@ -968,34 +1006,135 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       );
     }
 
-    void clearNewMealZeroValue(TextEditingController controller) {
-      if (editingMeal == null && controller.text == '0.0') {
-        updateControllerText(controller, '');
-      }
-    }
-
     void syncControllersFromDraft({_MealEditField? preserveField}) {
       if (isApplyingDraft) return;
       isApplyingDraft = true;
-      if (preserveField != _MealEditField.calories) {
-        updateControllerText(kcalCtrl, formDraft.kcal.toStringAsFixed(1));
+      void syncNumericController({
+        required TextEditingController controller,
+        required _MealEditField field,
+        required double value,
+      }) {
+        if (field == preserveField) return;
+        if (editingMeal == null &&
+            field == _MealEditField.calories &&
+            !formDraft.isManualCalorieOverride &&
+            !hasAllManualMacros()) {
+          if (controller.text.isNotEmpty) updateControllerText(controller, '');
+          return;
+        }
+        if (editingMeal == null && controller.text.isEmpty && value == 0) {
+          return;
+        }
+        updateControllerText(controller, value.toStringAsFixed(1));
       }
-      if (preserveField != _MealEditField.weight) {
-        updateControllerText(gramsCtrl, formDraft.grams.toStringAsFixed(1));
-      }
-      if (preserveField != _MealEditField.protein) {
-        updateControllerText(
-          proteinCtrl,
-          formDraft.proteinG.toStringAsFixed(1),
-        );
-      }
-      if (preserveField != _MealEditField.fat) {
-        updateControllerText(fatCtrl, formDraft.fatG.toStringAsFixed(1));
-      }
-      if (preserveField != _MealEditField.carbs) {
-        updateControllerText(carbsCtrl, formDraft.carbsG.toStringAsFixed(1));
-      }
+
+      syncNumericController(
+        controller: kcalCtrl,
+        field: _MealEditField.calories,
+        value: formDraft.kcal,
+      );
+      syncNumericController(
+        controller: gramsCtrl,
+        field: _MealEditField.weight,
+        value: formDraft.grams,
+      );
+      syncNumericController(
+        controller: proteinCtrl,
+        field: _MealEditField.protein,
+        value: formDraft.proteinG,
+      );
+      syncNumericController(
+        controller: fatCtrl,
+        field: _MealEditField.fat,
+        value: formDraft.fatG,
+      );
+      syncNumericController(
+        controller: carbsCtrl,
+        field: _MealEditField.carbs,
+        value: formDraft.carbsG,
+      );
       isApplyingDraft = false;
+    }
+
+    Future<void> showCalculatedCaloriesWarning(
+      StateSetter setSheetState,
+    ) async {
+      if (!caloriesAreCalculated() || isShowingCalculatedCaloriesDialog) {
+        return;
+      }
+      isShowingCalculatedCaloriesDialog = true;
+      final shouldEdit = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => Dialog(
+          key: const Key('calorie-calculated-dialog'),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 30),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 20,
+                      color: Color(0xFF356AE6),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Calculated calories',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Based on protein × 4, carbs × 4 and fat × 9. It’s the best estimate from your macros; editing is not recommended.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.35,
+                    color: Color(0xFF4B5563),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        key: const Key('calorie-override-keep'),
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
+                        child: const Text('Keep calculated'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        key: const Key('calorie-override-edit'),
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
+                        child: const Text('Edit anyway'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      isShowingCalculatedCaloriesDialog = false;
+      if (shouldEdit != true || !mounted) return;
+
+      formDraft = formDraft.enableManualCalorieOverride();
+      setSheetState(() {
+        formMessage = null;
+      });
     }
 
     void handleFieldChanged(
@@ -1006,6 +1145,12 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       if (isApplyingDraft) return;
       final parsedValue = _parseNonNegative(rawValue);
       if (parsedValue == null) {
+        if (editingMeal == null && isMacroField(field)) {
+          manuallyEnteredMacroFields.remove(field);
+          if (!formDraft.isManualCalorieOverride) {
+            updateControllerText(kcalCtrl, '');
+          }
+        }
         setSheetState(() {
           if (formDraft.inlineMessage == null) {
             formMessage = null;
@@ -1014,7 +1159,15 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
         return;
       }
 
-      formDraft = formDraft.applyUserEdit(field, parsedValue);
+      if (editingMeal == null && isMacroField(field)) {
+        manuallyEnteredMacroFields.add(field);
+      }
+      formDraft =
+          editingMeal == null &&
+              field == _MealEditField.calories &&
+              formDraft.isManualCalorieOverride
+          ? formDraft.applyManualCalorieOverride(parsedValue)
+          : formDraft.applyUserEdit(field, parsedValue);
       syncControllersFromDraft(preserveField: field);
       setSheetState(() {
         formMessage = formDraft.inlineMessage;
@@ -1227,6 +1380,41 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
           padding: EdgeInsets.fromLTRB(12, 8, 12, bottomInset),
           child: StatefulBuilder(
             builder: (context, setSheetState) {
+              updateExampleHints = setSheetState;
+              final showCalculatedCalories = caloriesAreCalculated();
+              final caloriesAwaitMacros =
+                  editingMeal == null && !hasAllManualMacros();
+              Widget caloriesInput() => _sheetInput(
+                controller: kcalCtrl,
+                fieldKeySuffix: 'calories',
+                label: 'Calories',
+                labelTrailing: showCalculatedCalories
+                    ? const _CalculatedFieldBadge()
+                    : null,
+                hint: caloriesAwaitMacros
+                    ? 'Enter all macros first'
+                    : numericHint(
+                        _MealEditField.calories,
+                        editingMeal?.kcal,
+                        '400',
+                      ),
+                readOnly: caloriesAwaitMacros || showCalculatedCalories,
+                onTap: showCalculatedCalories
+                    ? () => showCalculatedCaloriesWarning(setSheetState)
+                    : () => dismissExampleHint(_MealEditField.calories),
+                onFocus: () => dismissExampleHint(_MealEditField.calories),
+                numeric: true,
+                isLocked: formDraft.isLocked(_MealEditField.calories),
+                onDoubleTapLock: () =>
+                    lockField(_MealEditField.calories, setSheetState),
+                onUnlock: () =>
+                    unlockField(_MealEditField.calories, setSheetState),
+                onChanged: (value) => handleFieldChanged(
+                  _MealEditField.calories,
+                  value,
+                  setSheetState,
+                ),
+              );
               return Material(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(26),
@@ -1269,32 +1457,10 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                 hint: 'e.g. Caesar Salad',
                               ),
                               const SizedBox(height: 12),
-                              _sheetInput(
-                                controller: kcalCtrl,
-                                fieldKeySuffix: 'calories',
-                                label: 'Calories',
-                                hint: numericHint(editingMeal?.kcal, '0'),
-                                numeric: true,
-                                onTapDown: () =>
-                                    clearNewMealZeroValue(kcalCtrl),
-                                isLocked: formDraft.isLocked(
-                                  _MealEditField.calories,
-                                ),
-                                onDoubleTapLock: () => lockField(
-                                  _MealEditField.calories,
-                                  setSheetState,
-                                ),
-                                onUnlock: () => unlockField(
-                                  _MealEditField.calories,
-                                  setSheetState,
-                                ),
-                                onChanged: (value) => handleFieldChanged(
-                                  _MealEditField.calories,
-                                  value,
-                                  setSheetState,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
+                              if (editingMeal != null) ...[
+                                caloriesInput(),
+                                const SizedBox(height: 12),
+                              ],
                               Row(
                                 children: [
                                   Expanded(
@@ -1303,12 +1469,17 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                       fieldKeySuffix: 'weight',
                                       label: 'Weight (g)',
                                       hint: numericHint(
+                                        _MealEditField.weight,
                                         editingMeal?.portionG,
                                         '250',
                                       ),
+                                      onTap: () => dismissExampleHint(
+                                        _MealEditField.weight,
+                                      ),
+                                      onFocus: () => dismissExampleHint(
+                                        _MealEditField.weight,
+                                      ),
                                       numeric: true,
-                                      onTapDown: () =>
-                                          clearNewMealZeroValue(gramsCtrl),
                                       isLocked: formDraft.isLocked(
                                         _MealEditField.weight,
                                       ),
@@ -1334,12 +1505,17 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                       fieldKeySuffix: 'protein',
                                       label: 'Protein (g)',
                                       hint: numericHint(
+                                        _MealEditField.protein,
                                         editingMeal?.proteinG,
                                         '20',
                                       ),
+                                      onTap: () => dismissExampleHint(
+                                        _MealEditField.protein,
+                                      ),
+                                      onFocus: () => dismissExampleHint(
+                                        _MealEditField.protein,
+                                      ),
                                       numeric: true,
-                                      onTapDown: () =>
-                                          clearNewMealZeroValue(proteinCtrl),
                                       isLocked: formDraft.isLocked(
                                         _MealEditField.protein,
                                       ),
@@ -1368,10 +1544,18 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                       controller: fatCtrl,
                                       fieldKeySuffix: 'fat',
                                       label: 'Fat (g)',
-                                      hint: numericHint(editingMeal?.fatG, '8'),
+                                      hint: numericHint(
+                                        _MealEditField.fat,
+                                        editingMeal?.fatG,
+                                        '8',
+                                      ),
+                                      onTap: () => dismissExampleHint(
+                                        _MealEditField.fat,
+                                      ),
+                                      onFocus: () => dismissExampleHint(
+                                        _MealEditField.fat,
+                                      ),
                                       numeric: true,
-                                      onTapDown: () =>
-                                          clearNewMealZeroValue(fatCtrl),
                                       isLocked: formDraft.isLocked(
                                         _MealEditField.fat,
                                       ),
@@ -1397,12 +1581,17 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                       fieldKeySuffix: 'carbs',
                                       label: 'Carbs (g)',
                                       hint: numericHint(
+                                        _MealEditField.carbs,
                                         editingMeal?.carbsG,
                                         '30',
                                       ),
+                                      onTap: () => dismissExampleHint(
+                                        _MealEditField.carbs,
+                                      ),
+                                      onFocus: () => dismissExampleHint(
+                                        _MealEditField.carbs,
+                                      ),
                                       numeric: true,
-                                      onTapDown: () =>
-                                          clearNewMealZeroValue(carbsCtrl),
                                       isLocked: formDraft.isLocked(
                                         _MealEditField.carbs,
                                       ),
@@ -1423,6 +1612,10 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                   ),
                                 ],
                               ),
+                              if (editingMeal == null) ...[
+                                const SizedBox(height: 12),
+                                caloriesInput(),
+                              ],
                               const SizedBox(height: 14),
                               const Text(
                                 'Meal Type',
@@ -1777,11 +1970,14 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     required String hint,
     String? fieldKeySuffix,
     bool numeric = false,
+    bool readOnly = false,
     bool isLocked = false,
+    Widget? labelTrailing,
     VoidCallback? onDoubleTapLock,
     VoidCallback? onUnlock,
+    VoidCallback? onTap,
+    VoidCallback? onFocus,
     ValueChanged<String>? onChanged,
-    VoidCallback? onTapDown,
   }) {
     final borderColor = isLocked
         ? const Color(0xFFFACC15)
@@ -1789,9 +1985,14 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        Row(
+          children: [
+            Text(
+              label,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            if (labelTrailing != null) ...[const Spacer(), labelTrailing],
+          ],
         ),
         const SizedBox(height: 6),
         GestureDetector(
@@ -1801,7 +2002,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
             clipBehavior: Clip.none,
             children: [
               Listener(
-                onPointerDown: onTapDown == null ? null : (_) => onTapDown(),
+                onPointerDown: onTap == null ? null : (_) => onTap(),
                 child: Container(
                   key: fieldKeySuffix == null
                       ? null
@@ -1814,37 +2015,45 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                       width: isLocked ? 2 : 0,
                     ),
                   ),
-                  child: TextField(
-                    controller: controller,
-                    onChanged: onChanged,
-                    keyboardType: numeric
-                        ? const TextInputType.numberWithOptions(decimal: true)
-                        : TextInputType.text,
-                    decoration: InputDecoration(
-                      hintText: hint,
-                      filled: true,
-                      fillColor: Colors.transparent,
-                      contentPadding: EdgeInsets.fromLTRB(
-                        14,
-                        14,
-                        isLocked ? 40 : 14,
-                        14,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(
-                          color: isLocked
-                              ? const Color(0xFFFACC15)
-                              : const Color(0xFF7E9EF1),
-                          width: 2,
+                  child: Focus(
+                    onFocusChange: (hasFocus) {
+                      if (hasFocus) onFocus?.call();
+                    },
+                    child: TextField(
+                      controller: controller,
+                      readOnly: readOnly,
+                      showCursor: !readOnly,
+                      onTap: onTap,
+                      onChanged: onChanged,
+                      keyboardType: numeric
+                          ? const TextInputType.numberWithOptions(decimal: true)
+                          : TextInputType.text,
+                      decoration: InputDecoration(
+                        hintText: hint,
+                        filled: true,
+                        fillColor: Colors.transparent,
+                        contentPadding: EdgeInsets.fromLTRB(
+                          14,
+                          14,
+                          isLocked ? 40 : 14,
+                          14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: isLocked
+                                ? const Color(0xFFFACC15)
+                                : const Color(0xFF7E9EF1),
+                            width: 2,
+                          ),
                         ),
                       ),
                     ),
@@ -3407,6 +3616,37 @@ DateTime _timestampFromDayAndTime(DateTime day, String timeLabel) {
     }
   }
   return day;
+}
+
+class _CalculatedFieldBadge extends StatelessWidget {
+  const _CalculatedFieldBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('calorie-calculated-badge'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF0FF),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.auto_awesome_rounded, size: 13, color: Color(0xFF356AE6)),
+          SizedBox(width: 4),
+          Text(
+            'Calculated',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF2856C8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _NumberBlock extends StatelessWidget {

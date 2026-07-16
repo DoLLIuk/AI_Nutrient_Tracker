@@ -12,6 +12,21 @@ import 'package:my_new_app/photo_food/photo_picker.dart';
 import 'package:my_new_app/photo_food/repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+Finder _mealInput(String suffix) {
+  return find.descendant(
+    of: find.byKey(Key('meal-input-$suffix')),
+    matching: find.byType(TextField),
+  );
+}
+
+Future<void> _enterManualMealValue(
+  WidgetTester tester,
+  String field,
+  String value,
+) {
+  return tester.enterText(_mealInput(field), value);
+}
+
 void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
@@ -138,10 +153,10 @@ void main() {
 
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'Test meal');
-    await tester.enterText(fields.at(2), '250');
-    await tester.enterText(fields.at(3), '25');
-    await tester.enterText(fields.at(4), '10');
-    await tester.enterText(fields.at(5), '30');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '25');
+    await _enterManualMealValue(tester, 'fat', '10');
+    await _enterManualMealValue(tester, 'carbs', '30');
     await tester.ensureVisible(find.text('Add Meal').last);
     await tester.tap(find.text('Add Meal').last);
     await tester.pumpAndSettle();
@@ -167,10 +182,10 @@ void main() {
 
     final secondFields = find.byType(TextField);
     await tester.enterText(secondFields.at(0), 'Second test meal');
-    await tester.enterText(secondFields.at(2), '250');
-    await tester.enterText(secondFields.at(3), '25');
-    await tester.enterText(secondFields.at(4), '10');
-    await tester.enterText(secondFields.at(5), '30');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '25');
+    await _enterManualMealValue(tester, 'fat', '10');
+    await _enterManualMealValue(tester, 'carbs', '30');
     await tester.ensureVisible(find.text('Add Meal').last);
     await tester.tap(find.text('Add Meal').last);
     await tester.pumpAndSettle();
@@ -1227,11 +1242,10 @@ void main() {
 
       final fields = find.byType(TextField);
       await tester.enterText(fields.at(0), 'CategoryTapMeal');
-      await tester.enterText(fields.at(1), '420');
-      await tester.enterText(fields.at(2), '250');
-      await tester.enterText(fields.at(3), '24');
-      await tester.enterText(fields.at(4), '12');
-      await tester.enterText(fields.at(5), '40');
+      await _enterManualMealValue(tester, 'weight', '250');
+      await _enterManualMealValue(tester, 'protein', '24');
+      await _enterManualMealValue(tester, 'fat', '12');
+      await _enterManualMealValue(tester, 'carbs', '40');
       await tester.ensureVisible(find.byKey(const Key('meal-type-lunch')));
       await tester.tap(find.byKey(const Key('meal-type-lunch')));
       await tester.ensureVisible(find.text('Add Meal').last);
@@ -1489,11 +1503,10 @@ void main() {
 
       final fields = find.byType(TextField);
       await tester.enterText(fields.at(0), 'Test Meal');
-      await tester.enterText(fields.at(1), '250');
-      await tester.enterText(fields.at(2), '250');
-      await tester.enterText(fields.at(3), '25');
-      await tester.enterText(fields.at(4), '10');
-      await tester.enterText(fields.at(5), '30');
+      await _enterManualMealValue(tester, 'weight', '250');
+      await _enterManualMealValue(tester, 'protein', '25');
+      await _enterManualMealValue(tester, 'fat', '10');
+      await _enterManualMealValue(tester, 'carbs', '30');
       await tester.ensureVisible(find.text('Add Meal').last);
       await tester.tap(find.text('Add Meal').last);
       await tester.pumpAndSettle();
@@ -1533,7 +1546,7 @@ void main() {
     },
   );
   testWidgets(
-    'new manual meal clears auto-filled zeroes when numeric fields receive focus',
+    'new manual meal uses disappearing example hints instead of zero values',
     (tester) async {
       final controller = PhotoFoodController(
         repository: _FakeRepository(),
@@ -1554,17 +1567,71 @@ void main() {
         matching: find.byType(TextField),
       );
 
-      await tester.enterText(input('calories'), '400');
-      await tester.pump();
+      const examples = {
+        'weight': 'e.g. 250',
+        'protein': 'e.g. 20',
+        'fat': 'e.g. 8',
+        'carbs': 'e.g. 30',
+      };
+      for (final entry in examples.entries) {
+        final field = input(entry.key);
+        final textField = tester.widget<TextField>(field);
+        expect(textField.controller!.text, isEmpty);
+        expect(textField.decoration?.hintText, entry.value);
+      }
+
+      final calories = tester.widget<TextField>(input('calories'));
+      expect(calories.controller!.text, isEmpty);
+      expect(calories.decoration?.hintText, 'Enter all macros first');
+      expect(calories.readOnly, isTrue);
 
       for (final suffix in ['weight', 'protein', 'fat', 'carbs']) {
         final field = input(suffix);
         await tester.ensureVisible(field);
-        expect(tester.widget<TextField>(field).controller!.text, '0.0');
-        await tester.tap(field);
+        expect(tester.widget<TextField>(field).controller!.text, isEmpty);
+        if (suffix == 'weight') {
+          await tester.tap(field);
+        } else {
+          await tester.showKeyboard(field);
+        }
         await tester.pump(const Duration(milliseconds: 50));
         expect(tester.widget<TextField>(field).controller!.text, isEmpty);
+        expect(tester.widget<TextField>(field).decoration?.hintText, isEmpty);
       }
+
+      final fatField = input('fat');
+      await tester.enterText(fatField, '0');
+      await tester.pump();
+      expect(tester.widget<TextField>(fatField).controller!.text, '0');
+
+      await tester.enterText(input('protein'), '20');
+      await tester.enterText(input('carbs'), '30');
+      await tester.pump();
+      expect(find.byKey(const Key('calorie-calculated-badge')), findsOneWidget);
+      expect(
+        tester.widget<TextField>(input('calories')).controller!.text,
+        '200.0',
+      );
+      expect(tester.widget<TextField>(input('calories')).readOnly, isTrue);
+
+      await tester.ensureVisible(input('calories'));
+      await tester.tap(input('calories'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('calorie-calculated-dialog')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('calorie-override-edit')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(input('calories')).readOnly, isFalse);
+      await tester.enterText(input('calories'), '225');
+      await tester.pump();
+      expect(
+        tester.widget<TextField>(input('protein')).controller!.text,
+        '20.0',
+      );
+      expect(tester.widget<TextField>(input('fat')).controller!.text, '0.0');
+      expect(tester.widget<TextField>(input('carbs')).controller!.text, '30.0');
     },
   );
   testWidgets('editing meal protein saves manual macro override', (
@@ -1586,11 +1653,10 @@ void main() {
 
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'Protein Edit Meal');
-    await tester.enterText(fields.at(1), '250');
-    await tester.enterText(fields.at(2), '250');
-    await tester.enterText(fields.at(3), '25');
-    await tester.enterText(fields.at(4), '10');
-    await tester.enterText(fields.at(5), '30');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '25');
+    await _enterManualMealValue(tester, 'fat', '10');
+    await _enterManualMealValue(tester, 'carbs', '30');
     await tester.ensureVisible(find.text('Add Meal').last);
     await tester.tap(find.text('Add Meal').last);
     await tester.pumpAndSettle();
@@ -1635,11 +1701,10 @@ void main() {
 
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'Hint Source Meal');
-    await tester.enterText(fields.at(1), '290');
-    await tester.enterText(fields.at(2), '250');
-    await tester.enterText(fields.at(3), '25');
-    await tester.enterText(fields.at(4), '10');
-    await tester.enterText(fields.at(5), '30');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '25');
+    await _enterManualMealValue(tester, 'fat', '10');
+    await _enterManualMealValue(tester, 'carbs', '30');
     await tester.ensureVisible(find.text('Add Meal').last);
     await tester.tap(find.text('Add Meal').last);
     await tester.pumpAndSettle();
@@ -1654,11 +1719,17 @@ void main() {
     final editFields = tester
         .widgetList<TextField>(find.byType(TextField))
         .toList();
-    expect(editFields[1].decoration?.hintText, '290');
+    expect(editFields[1].decoration?.hintText, '310');
     expect(editFields[2].decoration?.hintText, '250');
     expect(editFields[3].decoration?.hintText, '25');
     expect(editFields[4].decoration?.hintText, '10');
     expect(editFields[5].decoration?.hintText, '30');
+    expect(editFields[1].controller?.text, '310.0');
+    expect(editFields[2].controller?.text, '250.0');
+
+    await tester.showKeyboard(find.byType(TextField).at(2));
+    await tester.pump();
+    expect(editFields[2].controller?.text, '250.0');
   });
   testWidgets('editing inconsistent meal shows reset auto calc immediately', (
     tester,
@@ -1795,10 +1866,10 @@ void main() {
 
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'Locked Calories Proposal');
-    await tester.enterText(fields.at(2), '250');
-    await tester.enterText(fields.at(3), '25');
-    await tester.enterText(fields.at(4), '10');
-    await tester.enterText(fields.at(5), '30');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '25');
+    await _enterManualMealValue(tester, 'fat', '10');
+    await _enterManualMealValue(tester, 'carbs', '30');
     await tester.ensureVisible(find.text('Add Meal').last);
     await tester.tap(find.text('Add Meal').last);
     await tester.pumpAndSettle();
@@ -1864,10 +1935,10 @@ void main() {
 
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'Protein Auto Save Meal');
-    await tester.enterText(fields.at(2), '250');
-    await tester.enterText(fields.at(3), '25');
-    await tester.enterText(fields.at(4), '10');
-    await tester.enterText(fields.at(5), '30');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '25');
+    await _enterManualMealValue(tester, 'fat', '10');
+    await _enterManualMealValue(tester, 'carbs', '30');
     await tester.ensureVisible(find.text('Add Meal').last);
     await tester.tap(find.text('Add Meal').last);
     await tester.pumpAndSettle();
@@ -1915,8 +1986,7 @@ void main() {
     await tester.tap(find.byKey(const Key('add-manual')));
     await tester.pumpAndSettle();
 
-    final fields = find.byType(TextField);
-    await tester.enterText(fields.at(3), '40');
+    await _enterManualMealValue(tester, 'protein', '40');
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('meal-lock-protein')), findsOneWidget);
@@ -1946,11 +2016,10 @@ void main() {
 
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'Double Tap Lock Meal');
-    await tester.enterText(fields.at(1), '250');
-    await tester.enterText(fields.at(2), '250');
-    await tester.enterText(fields.at(3), '25');
-    await tester.enterText(fields.at(4), '10');
-    await tester.enterText(fields.at(5), '30');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '25');
+    await _enterManualMealValue(tester, 'fat', '10');
+    await _enterManualMealValue(tester, 'carbs', '30');
     await tester.ensureVisible(find.text('Add Meal').last);
     await tester.tap(find.text('Add Meal').last);
     await tester.pumpAndSettle();
@@ -1996,13 +2065,16 @@ void main() {
     await tester.tap(find.byKey(const Key('add-manual')));
     await tester.pumpAndSettle();
 
-    final fields = find.byType(TextField);
-    await tester.enterText(fields.at(2), '250');
-    await tester.enterText(fields.at(3), '25');
-    await tester.enterText(fields.at(4), '10');
-    await tester.enterText(fields.at(5), '30');
-    await tester.enterText(fields.at(1), '400');
-    await tester.enterText(fields.at(3), '40');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '25');
+    await _enterManualMealValue(tester, 'fat', '10');
+    await _enterManualMealValue(tester, 'carbs', '30');
+    await tester.tap(_mealInput('calories'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('calorie-override-edit')));
+    await tester.pumpAndSettle();
+    await _enterManualMealValue(tester, 'calories', '400');
+    await _enterManualMealValue(tester, 'protein', '40');
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('meal-lock-calories')), findsOneWidget);
@@ -2031,12 +2103,16 @@ void main() {
 
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'Locked Protein Meal');
-    await tester.enterText(fields.at(2), '250');
-    await tester.enterText(fields.at(3), '25');
-    await tester.enterText(fields.at(4), '10');
-    await tester.enterText(fields.at(5), '30');
-    await tester.enterText(fields.at(3), '40');
-    await tester.enterText(fields.at(1), '500');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '25');
+    await _enterManualMealValue(tester, 'fat', '10');
+    await _enterManualMealValue(tester, 'carbs', '30');
+    await tester.tap(_mealInput('calories'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('calorie-override-edit')));
+    await tester.pumpAndSettle();
+    await _enterManualMealValue(tester, 'protein', '40');
+    await _enterManualMealValue(tester, 'calories', '500');
     await tester.ensureVisible(find.text('Add Meal').last);
     await tester.tap(find.text('Add Meal').last);
     await tester.pumpAndSettle();
@@ -2066,10 +2142,10 @@ void main() {
 
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'Fat Auto Save Meal');
-    await tester.enterText(fields.at(2), '250');
-    await tester.enterText(fields.at(3), '25');
-    await tester.enterText(fields.at(4), '10');
-    await tester.enterText(fields.at(5), '30');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '25');
+    await _enterManualMealValue(tester, 'fat', '10');
+    await _enterManualMealValue(tester, 'carbs', '30');
     await tester.ensureVisible(find.text('Add Meal').last);
     await tester.tap(find.text('Add Meal').last);
     await tester.pumpAndSettle();
@@ -2119,10 +2195,10 @@ void main() {
 
       final fields = find.byType(TextField);
       await tester.enterText(fields.at(0), 'Multi Manual Macro Meal');
-      await tester.enterText(fields.at(2), '250');
-      await tester.enterText(fields.at(3), '25');
-      await tester.enterText(fields.at(4), '10');
-      await tester.enterText(fields.at(5), '30');
+      await _enterManualMealValue(tester, 'weight', '250');
+      await _enterManualMealValue(tester, 'protein', '25');
+      await _enterManualMealValue(tester, 'fat', '10');
+      await _enterManualMealValue(tester, 'carbs', '30');
       await tester.ensureVisible(find.text('Add Meal').last);
       await tester.tap(find.text('Add Meal').last);
       await tester.pumpAndSettle();
@@ -2175,10 +2251,10 @@ void main() {
 
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'Carbs Auto Save Meal');
-    await tester.enterText(fields.at(2), '250');
-    await tester.enterText(fields.at(3), '25');
-    await tester.enterText(fields.at(4), '10');
-    await tester.enterText(fields.at(5), '30');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '25');
+    await _enterManualMealValue(tester, 'fat', '10');
+    await _enterManualMealValue(tester, 'carbs', '30');
     await tester.ensureVisible(find.text('Add Meal').last);
     await tester.tap(find.text('Add Meal').last);
     await tester.pumpAndSettle();
@@ -2226,20 +2302,18 @@ void main() {
     await tester.tap(find.byKey(const Key('add-manual')));
     await tester.pumpAndSettle();
 
-    final fields = find.byType(TextField);
-    await tester.enterText(fields.at(2), '250');
-    await tester.enterText(fields.at(3), '40');
-    await tester.enterText(fields.at(4), '20');
-    await tester.enterText(fields.at(5), '50');
-    await tester.enterText(fields.at(1), '400');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '40');
+    await _enterManualMealValue(tester, 'fat', '20');
+    await _enterManualMealValue(tester, 'carbs', '50');
+    await tester.tap(_mealInput('calories'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('calorie-override-edit')));
+    await tester.pumpAndSettle();
+    await _enterManualMealValue(tester, 'calories', '400');
     await tester.pumpAndSettle();
 
-    expect(
-      find.text(
-        'All macros are manually locked. Unlock one macro or reset auto-calc to continue.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('meal-form-message')), findsNothing);
     expect(find.byKey(const Key('meal-lock-protein')), findsOneWidget);
     await tester.tap(find.byKey(const Key('meal-lock-protein')));
     await tester.pumpAndSettle();
@@ -2278,10 +2352,10 @@ void main() {
 
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'Weight Lock Meal');
-    await tester.enterText(fields.at(2), '250');
-    await tester.enterText(fields.at(3), '25');
-    await tester.enterText(fields.at(4), '10');
-    await tester.enterText(fields.at(5), '30');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '25');
+    await _enterManualMealValue(tester, 'fat', '10');
+    await _enterManualMealValue(tester, 'carbs', '30');
     await tester.ensureVisible(find.text('Add Meal').last);
     await tester.tap(find.text('Add Meal').last);
     await tester.pumpAndSettle();
@@ -2325,13 +2399,16 @@ void main() {
     await tester.tap(find.byKey(const Key('add-manual')));
     await tester.pumpAndSettle();
 
-    final fields = find.byType(TextField);
-    await tester.enterText(fields.at(2), '250');
-    await tester.enterText(fields.at(3), '25');
-    await tester.enterText(fields.at(4), '10');
-    await tester.enterText(fields.at(5), '30');
-    await tester.enterText(fields.at(1), '400');
-    await tester.enterText(fields.at(3), '40');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '25');
+    await _enterManualMealValue(tester, 'fat', '10');
+    await _enterManualMealValue(tester, 'carbs', '30');
+    await tester.tap(_mealInput('calories'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('calorie-override-edit')));
+    await tester.pumpAndSettle();
+    await _enterManualMealValue(tester, 'calories', '400');
+    await _enterManualMealValue(tester, 'protein', '40');
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('reset-auto-calc')), findsOneWidget);
@@ -2364,11 +2441,10 @@ void main() {
 
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'Restore Start Meal');
-    await tester.enterText(fields.at(1), '290');
-    await tester.enterText(fields.at(2), '250');
-    await tester.enterText(fields.at(3), '25');
-    await tester.enterText(fields.at(4), '10');
-    await tester.enterText(fields.at(5), '30');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '25');
+    await _enterManualMealValue(tester, 'fat', '10');
+    await _enterManualMealValue(tester, 'carbs', '30');
     await tester.ensureVisible(find.text('Add Meal').last);
     await tester.tap(find.text('Add Meal').last);
     await tester.pumpAndSettle();
@@ -2394,7 +2470,7 @@ void main() {
         .widgetList<TextField>(find.byType(TextField))
         .toList();
     expect(restoredFields[0].controller?.text, 'Restore Start Meal');
-    expect(restoredFields[1].controller?.text, '290.0');
+    expect(restoredFields[1].controller?.text, '310.0');
     expect(restoredFields[2].controller?.text, '250.0');
     expect(restoredFields[3].controller?.text, '25.0');
     expect(restoredFields[4].controller?.text, '10.0');
@@ -2422,22 +2498,21 @@ void main() {
 
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'Conflict Meal');
-    await tester.enterText(fields.at(2), '250');
-    await tester.enterText(fields.at(3), '25');
-    await tester.enterText(fields.at(4), '10');
-    await tester.enterText(fields.at(5), '30');
-    await tester.enterText(fields.at(3), '40');
-    await tester.enterText(fields.at(4), '20');
-    await tester.enterText(fields.at(5), '50');
-    await tester.enterText(fields.at(1), '400');
+    await _enterManualMealValue(tester, 'weight', '250');
+    await _enterManualMealValue(tester, 'protein', '25');
+    await _enterManualMealValue(tester, 'fat', '10');
+    await _enterManualMealValue(tester, 'carbs', '30');
+    await _enterManualMealValue(tester, 'protein', '40');
+    await _enterManualMealValue(tester, 'fat', '20');
+    await _enterManualMealValue(tester, 'carbs', '50');
+    await tester.tap(_mealInput('calories'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('calorie-override-edit')));
+    await tester.pumpAndSettle();
+    await _enterManualMealValue(tester, 'calories', '400');
     await tester.pumpAndSettle();
 
-    expect(
-      find.text(
-        'All macros are manually locked. Unlock one macro or reset auto-calc to continue.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('meal-form-message')), findsNothing);
     await tester.ensureVisible(find.text('Add Meal').last);
     await tester.tap(find.text('Add Meal').last);
     await tester.pumpAndSettle();
@@ -2532,11 +2607,10 @@ void main() {
 
       final fields = find.byType(TextField);
       await tester.enterText(fields.at(0), 'Late Breakfast');
-      await tester.enterText(fields.at(1), '320');
-      await tester.enterText(fields.at(2), '150');
-      await tester.enterText(fields.at(3), '25');
-      await tester.enterText(fields.at(4), '10');
-      await tester.enterText(fields.at(5), '30');
+      await _enterManualMealValue(tester, 'weight', '150');
+      await _enterManualMealValue(tester, 'protein', '25');
+      await _enterManualMealValue(tester, 'fat', '10');
+      await _enterManualMealValue(tester, 'carbs', '30');
       await tester.ensureVisible(find.byKey(const Key('meal-type-breakfast')));
       await tester.tap(find.byKey(const Key('meal-type-breakfast')));
       await tester.ensureVisible(find.byKey(const Key('manual-meal-submit')));
