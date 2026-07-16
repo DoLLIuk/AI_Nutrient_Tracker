@@ -1,6 +1,6 @@
 # Meal History: Delayed Logging And Category Moves
 
-Status: approved product plan; not implemented yet.
+Status: implementation in progress; optional meal-time picker deferred.
 
 Last updated: 2026-07-16
 
@@ -32,7 +32,7 @@ Do not overload one timestamp with two meanings. Preserve these values separatel
 | `historyMode` | `timed` or `categoryOnly`; controls grouping and time visibility. |
 | `categoryPlacedAt` | Time of the latest move into a category-only bucket; used only to append those meals deterministically. |
 
-Migration rule: existing saved meals retain their current timestamp as both `loggedAt` and `consumedAt`, start in `timed` mode, and must not visibly move during the migration.
+Migration rule: existing saved meals retain their current timestamp as both `loggedAt` and the legacy `consumedAt` value. Records with a legacy explicit category that conflicts with their timestamp migrate to `categoryOnly` so their prior category intent is preserved; every other legacy record starts in `timed` mode.
 
 ## History And Session Rules
 

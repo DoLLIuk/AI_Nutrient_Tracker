@@ -297,7 +297,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     final previousIds = previousMeals.map((meal) => meal.requestId).toSet();
     final addedMeals =
         meals.where((meal) => !previousIds.contains(meal.requestId)).toList()
-          ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          ..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
     final knownMealIds = Set<String>.from(previousIds);
 
     _persistedMeals = List<_MealEntry>.from(meals);
@@ -307,11 +307,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       final meal = addedMeals[index];
       final now = widget.nowProvider?.call() ?? DateTime.now();
       final dayOffset = _dateOnly(meal.day).difference(_dateOnly(now)).inDays;
-      final createsNewSession = !meals.any(
-        (existingMeal) =>
-            existingMeal.sessionId == meal.sessionId &&
-            knownMealIds.contains(existingMeal.requestId),
-      );
+      final createsNewSession =
+          meal.isCategoryOnly ||
+          !meals.any(
+            (existingMeal) =>
+                existingMeal.sessionId == meal.sessionId &&
+                knownMealIds.contains(existingMeal.requestId),
+          );
       final properties = <String, Object?>{
         'source': meal.origin.name,
         'day_offset': dayOffset,
@@ -593,20 +595,20 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
   }
 
   double get _sumKcal =>
-      _selectedSessions.fold(0.0, (sum, session) => sum + session.totalKcal);
+      _selectedMeals.fold(0.0, (sum, meal) => sum + meal.kcal);
   double get _sumProtein =>
-      _selectedSessions.fold(0.0, (sum, session) => sum + session.totalProtein);
+      _selectedMeals.fold(0.0, (sum, meal) => sum + meal.proteinG);
   double get _sumCarbs =>
-      _selectedSessions.fold(0.0, (sum, session) => sum + session.totalCarbs);
+      _selectedMeals.fold(0.0, (sum, meal) => sum + meal.carbsG);
   double get _sumFats =>
-      _selectedSessions.fold(0.0, (sum, session) => sum + session.totalFat);
+      _selectedMeals.fold(0.0, (sum, meal) => sum + meal.fatG);
   double _proteinForDay(DateTime day) => meals
       .where((m) => _isSameDate(m.day, day))
       .fold(0.0, (sum, meal) => sum + meal.proteinG);
   _MealEntry? get _latestAddedMealForSelectedDay {
     if (_selectedMeals.isEmpty) return null;
     final ordered = List<_MealEntry>.from(_selectedMeals)
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      ..sort((a, b) => b.loggedAt.compareTo(a.loggedAt));
     return ordered.first;
   }
 
@@ -654,17 +656,20 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     final dayMeals = meals
         .where((m) => _isSameDate(m.day, dayOnly))
         .toList(growable: false);
-    final dayEntries = dayMeals
+    final timedDayMeals = dayMeals
+        .where((meal) => meal.historyMode == MealHistoryMode.timed)
+        .toList(growable: false);
+    final dayEntries = timedDayMeals
         .map(
           (meal) => MealSessionEntry(
             id: meal.requestId,
-            timestamp: meal.timestamp,
+            timestamp: meal.consumedAt,
             name: meal.name,
             kcal: meal.kcal,
             proteinG: meal.proteinG,
             fatG: meal.fatG,
             carbsG: meal.carbsG,
-            userSelectedSessionType: meal.userSelectedType,
+            userSelectedSessionType: null,
           ),
         )
         .toList(growable: false);
@@ -691,15 +696,32 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       }
       final session = _sessionsByEntryId[meal.requestId];
       if (session == null) {
+        if (meal.historyMode == MealHistoryMode.categoryOnly) {
+          final autoDetectedType = classifyMealTypeByTime(meal.consumedAt);
+          final finalType = meal.userSelectedType ?? meal.finalType;
+          meals[i] = meal.copyWith(
+            sessionId: '',
+            autoDetectedType: autoDetectedType,
+            autoDetectedTier: classifySessionTierForType(
+              type: autoDetectedType,
+              totalKcal: meal.kcal,
+              dailyCalorieTarget: _dailyCalorieTarget,
+            ),
+            finalType: finalType,
+            finalTier: classifySessionTierForType(
+              type: finalType,
+              totalKcal: meal.kcal,
+              dailyCalorieTarget: _dailyCalorieTarget,
+            ),
+          );
+        }
         continue;
       }
       meals[i] = meal.copyWith(
         sessionId: session.id,
         autoDetectedType: session.autoDetectedType,
         autoDetectedTier: session.autoDetectedTier,
-        finalType: session.overriddenByUser
-            ? meal.userSelectedType ?? session.finalType
-            : session.autoDetectedType,
+        finalType: session.autoDetectedType,
         finalTier: session.finalTier,
       );
     }
@@ -770,6 +792,9 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       name: response.item.name,
       day: _selectedDate,
       timestamp: entryTimestamp,
+      loggedAt: now,
+      historyMode: MealHistoryMode.timed,
+      categoryPlacedAt: null,
       kcal: totals?.kcal ?? 0,
       proteinG: totals?.proteinG ?? 0,
       carbsG: totals?.carbsG ?? 0,
@@ -921,7 +946,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     var selectedMealType =
         editingMeal?.userSelectedType ??
         editingMeal?.finalType ??
-        classifyMealTypeByTime(DateTime.now());
+        classifyMealTypeByTime(_now);
     var formDraft = _MealFormDraft.fromMeal(editingMeal);
     final initialFormDraft = formDraft;
     final initialMealType = selectedMealType;
@@ -1926,6 +1951,16 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
 
     if (original != null) {
       final per100Factor = 100.0 / draft.grams;
+      final historyMode = _historyModeForMealType(
+        consumedAt: original.consumedAt,
+        mealType: mealType,
+      );
+      final categoryPlacedAt = historyMode == MealHistoryMode.categoryOnly
+          ? (original.historyMode != MealHistoryMode.categoryOnly ||
+                    original.finalType != mealType
+                ? _now
+                : original.categoryPlacedAt ?? original.loggedAt)
+          : null;
 
       return _MealEntry(
         requestId: original.requestId,
@@ -1933,6 +1968,9 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
         name: mealName,
         day: original.day,
         timestamp: original.timestamp,
+        loggedAt: original.loggedAt,
+        historyMode: historyMode,
+        categoryPlacedAt: categoryPlacedAt,
         kcal: draft.kcal,
         proteinG: draft.proteinG,
         carbsG: draft.carbsG,
@@ -1953,7 +1991,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     }
 
     final factor = 100.0 / draft.grams;
-    final now = DateTime.now();
+    final now = _now;
     final entryTimestamp = DateTime(
       _selectedDate.year,
       _selectedDate.month,
@@ -1964,12 +2002,21 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       now.millisecond,
       now.microsecond,
     );
+    final historyMode = _historyModeForMealType(
+      consumedAt: entryTimestamp,
+      mealType: mealType,
+    );
     return _MealEntry(
       requestId: 'manual_${DateTime.now().microsecondsSinceEpoch}',
       origin: MealOrigin.manual,
       name: mealName,
       day: _selectedDate,
       timestamp: entryTimestamp,
+      loggedAt: now,
+      historyMode: historyMode,
+      categoryPlacedAt: historyMode == MealHistoryMode.categoryOnly
+          ? now
+          : null,
       kcal: draft.kcal,
       proteinG: draft.proteinG,
       carbsG: draft.carbsG,
@@ -1988,6 +2035,13 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       finalTier: MealSessionTier.extra,
     );
   }
+
+  MealHistoryMode _historyModeForMealType({
+    required DateTime consumedAt,
+    required MealType mealType,
+  }) => classifyMealTypeByTime(consumedAt) == mealType
+      ? MealHistoryMode.timed
+      : MealHistoryMode.categoryOnly;
 
   double? _parseNonNegative(String value) {
     final parsed = double.tryParse(value.trim().replaceAll(',', '.'));
@@ -2365,7 +2419,8 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                 Text(
                   'Confidence: ${(meal.confidence * 100).toStringAsFixed(0)}%',
                 ),
-                Text('Time: ${_timeLabelFromDateTime(meal.timestamp)}'),
+                if (!meal.isCategoryOnly)
+                  Text('Time: ${_timeLabelFromDateTime(meal.consumedAt)}'),
                 const SizedBox(height: 12),
                 Text('Portion: ${meal.portionG?.toStringAsFixed(0) ?? '-'} g'),
                 Text('Calories: ${meal.kcal.toStringAsFixed(1)} kcal'),
@@ -2449,6 +2504,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
 
   List<_CategorySectionModel> _buildCategorySections(
     List<MealSession> sessions,
+    List<_MealEntry> categoryOnlyMeals,
     double dailyTarget,
   ) {
     const orderedTypes = [
@@ -2469,13 +2525,29 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       grouped[session.finalType]!.add(session);
     }
 
+    final categoryOnlyByType = <MealType, List<_MealEntry>>{
+      for (final type in orderedTypes) type: <_MealEntry>[],
+    };
+    for (final meal in categoryOnlyMeals) {
+      categoryOnlyByType[meal.finalType]!.add(meal);
+    }
+
     for (final type in orderedTypes) {
       grouped[type]!.sort((a, b) => b.startTime.compareTo(a.startTime));
+      categoryOnlyByType[type]!.sort((a, b) {
+        final aPosition = a.categoryPlacedAt ?? a.loggedAt;
+        final bPosition = b.categoryPlacedAt ?? b.loggedAt;
+        final byPosition = aPosition.compareTo(bPosition);
+        return byPosition != 0
+            ? byPosition
+            : a.requestId.compareTo(b.requestId);
+      });
     }
 
     return orderedTypes
         .map((type) {
           final categorySessions = grouped[type]!;
+          final categoryOnlyEntries = categoryOnlyByType[type]!;
           final mainSessions = <MealSession>[];
           final extraSessions = <MealSession>[];
           final snackSessions = <MealSession>[];
@@ -2495,13 +2567,16 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
           return _CategorySectionModel(
             type: type,
             goalKcal: _categoryGoalKcal(type, dailyTarget),
-            consumedKcal: categorySessions.fold(
-              0.0,
-              (sum, session) => sum + session.totalKcal,
-            ),
+            consumedKcal:
+                categorySessions.fold(
+                  0.0,
+                  (sum, session) => sum + session.totalKcal,
+                ) +
+                categoryOnlyEntries.fold(0.0, (sum, meal) => sum + meal.kcal),
             mainSessions: mainSessions,
             extraSessions: extraSessions,
             snackSessions: snackSessions,
+            categoryOnlyMeals: categoryOnlyEntries,
           );
         })
         .toList(growable: false);
@@ -2514,8 +2589,11 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       builder: (context, _) {
         final state = widget.controller.state;
         final daySessions = _selectedSessions;
+        final categoryOnlyMeals = _selectedMeals
+            .where((meal) => meal.isCategoryOnly)
+            .toList(growable: false);
         final latestMeal = _latestAddedMealForSelectedDay;
-        final hasMealsForSelectedDay = daySessions.isNotEmpty;
+        final hasMealsForSelectedDay = _selectedMeals.isNotEmpty;
         final now = _now;
 
         final consumed = _sumKcal;
@@ -2527,6 +2605,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
             : (consumed / calorieTarget).clamp(0.0, 1.0);
         final categorySections = _buildCategorySections(
           daySessions,
+          categoryOnlyMeals,
           calorieTarget,
         );
 
@@ -2839,6 +2918,8 @@ enum _AddAction { camera, gallery, manual }
 
 enum MealOrigin { ai, manual }
 
+enum MealHistoryMode { timed, categoryOnly }
+
 class _ClarificationOption {
   final DishCategory category;
   final String label;
@@ -2909,6 +2990,9 @@ class _MealEntry {
   final String name;
   final DateTime day;
   final DateTime timestamp;
+  final DateTime loggedAt;
+  final MealHistoryMode historyMode;
+  final DateTime? categoryPlacedAt;
   final double kcal;
   final double proteinG;
   final double carbsG;
@@ -2932,6 +3016,9 @@ class _MealEntry {
     required this.name,
     required this.day,
     required this.timestamp,
+    required this.loggedAt,
+    required this.historyMode,
+    required this.categoryPlacedAt,
     required this.kcal,
     required this.proteinG,
     required this.carbsG,
@@ -2950,7 +3037,11 @@ class _MealEntry {
     required this.sessionId,
   });
 
-  String get time => _timeLabelFromDateTime(timestamp);
+  /// Legacy storage calls this value `timestamp`; it is the known meal time.
+  DateTime get consumedAt => timestamp;
+  bool get isCategoryOnly => historyMode == MealHistoryMode.categoryOnly;
+  String? get time =>
+      isCategoryOnly ? null : _timeLabelFromDateTime(consumedAt);
   MealType get mealType => finalType;
   String get title => mealTypeLabel(finalType);
   IconData get icon => mealTypeIcon(finalType);
@@ -2961,6 +3052,10 @@ class _MealEntry {
     String? name,
     DateTime? day,
     DateTime? timestamp,
+    DateTime? loggedAt,
+    MealHistoryMode? historyMode,
+    DateTime? categoryPlacedAt,
+    bool clearCategoryPlacedAt = false,
     double? kcal,
     double? proteinG,
     double? carbsG,
@@ -2986,6 +3081,11 @@ class _MealEntry {
       name: name ?? this.name,
       day: day ?? this.day,
       timestamp: timestamp ?? this.timestamp,
+      loggedAt: loggedAt ?? this.loggedAt,
+      historyMode: historyMode ?? this.historyMode,
+      categoryPlacedAt: clearCategoryPlacedAt
+          ? null
+          : (categoryPlacedAt ?? this.categoryPlacedAt),
       kcal: kcal ?? this.kcal,
       proteinG: proteinG ?? this.proteinG,
       carbsG: carbsG ?? this.carbsG,
@@ -3013,6 +3113,10 @@ class _MealEntry {
     'name': name,
     'day': day.toIso8601String(),
     'timestamp': timestamp.toIso8601String(),
+    'consumedAt': consumedAt.toIso8601String(),
+    'loggedAt': loggedAt.toIso8601String(),
+    'historyMode': historyMode.name,
+    'categoryPlacedAt': categoryPlacedAt?.toIso8601String(),
     'kcal': kcal,
     'proteinG': proteinG,
     'carbsG': carbsG,
@@ -3065,12 +3169,27 @@ class _MealEntry {
         autoDetectedTier;
     final day =
         DateTime.tryParse((json['day'] as String?) ?? '') ?? DateTime.now();
-    final parsedTimestamp = DateTime.tryParse(
-      (json['timestamp'] as String?) ?? '',
-    );
+    final parsedTimestamp =
+        DateTime.tryParse((json['consumedAt'] as String?) ?? '') ??
+        DateTime.tryParse((json['timestamp'] as String?) ?? '');
     final legacyTime = (json['time'] as String?) ?? '';
     final timestamp =
         parsedTimestamp ?? _timestampFromDayAndTime(day, legacyTime);
+    final loggedAt =
+        DateTime.tryParse((json['loggedAt'] as String?) ?? '') ?? timestamp;
+    final storedHistoryMode = _enumByNameMain(
+      MealHistoryMode.values,
+      json['historyMode'] as String?,
+    );
+    final inferredHistoryMode =
+        userSelectedType != null &&
+            userSelectedType != classifyMealTypeByTime(timestamp)
+        ? MealHistoryMode.categoryOnly
+        : MealHistoryMode.timed;
+    final historyMode = storedHistoryMode ?? inferredHistoryMode;
+    final categoryPlacedAt = DateTime.tryParse(
+      (json['categoryPlacedAt'] as String?) ?? '',
+    );
 
     return _MealEntry(
       requestId: (json['requestId'] as String?) ?? '',
@@ -3078,6 +3197,11 @@ class _MealEntry {
       name: (json['name'] as String?) ?? '',
       day: _dateOnly(day),
       timestamp: timestamp,
+      loggedAt: loggedAt,
+      historyMode: historyMode,
+      categoryPlacedAt: historyMode == MealHistoryMode.categoryOnly
+          ? (categoryPlacedAt ?? loggedAt)
+          : null,
       kcal: (json['kcal'] as num?)?.toDouble() ?? 0,
       proteinG: (json['proteinG'] as num?)?.toDouble() ?? 0,
       carbsG: (json['carbsG'] as num?)?.toDouble() ?? 0,
@@ -3518,6 +3642,7 @@ class _CategorySectionModel {
   final List<MealSession> mainSessions;
   final List<MealSession> extraSessions;
   final List<MealSession> snackSessions;
+  final List<_MealEntry> categoryOnlyMeals;
 
   const _CategorySectionModel({
     required this.type,
@@ -3526,6 +3651,7 @@ class _CategorySectionModel {
     required this.mainSessions,
     required this.extraSessions,
     required this.snackSessions,
+    required this.categoryOnlyMeals,
   });
 }
 
@@ -3585,14 +3711,16 @@ class _LatestAddedMealCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    _timeLabelFromDateTime(meal!.timestamp),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF6B7280),
+                  if (!meal!.isCategoryOnly) ...[
+                    const SizedBox(width: 10),
+                    Text(
+                      _timeLabelFromDateTime(meal!.consumedAt),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF6B7280),
+                      ),
                     ),
-                  ),
+                  ],
                   const Spacer(),
                   Text(
                     '${meal!.kcal.toStringAsFixed(0)} kcal',
@@ -3796,6 +3924,46 @@ class _CategorySectionCard extends StatelessWidget {
     );
   }
 
+  Widget _buildCategoryOnlyList(List<_MealEntry> meals) {
+    return Column(
+      children: meals
+          .map(
+            (meal) => InkWell(
+              key: Key('category-entry-${meal.requestId}'),
+              onTap: () => onTapMeal(meal.requestId),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        meal.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${meal.kcal.toStringAsFixed(0)} kcal',
+                      style: const TextStyle(
+                        color: Color(0xFFD1D5DB),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final keySuffix = _typeKey(model.type);
@@ -3886,7 +4054,8 @@ class _CategorySectionCard extends StatelessWidget {
               child:
                   (model.mainSessions.isEmpty &&
                       model.extraSessions.isEmpty &&
-                      model.snackSessions.isEmpty)
+                      model.snackSessions.isEmpty &&
+                      model.categoryOnlyMeals.isEmpty)
                   ? const Padding(
                       padding: EdgeInsets.only(top: 8, bottom: 4),
                       child: Text(
@@ -3899,6 +4068,11 @@ class _CategorySectionCard extends StatelessWidget {
                       children: [
                         if (model.type == MealType.snack) ...[
                           _buildSessionList(model.snackSessions),
+                          if (model.snackSessions.isNotEmpty &&
+                              model.categoryOnlyMeals.isNotEmpty)
+                            const SizedBox(height: 4),
+                          if (model.categoryOnlyMeals.isNotEmpty)
+                            _buildCategoryOnlyList(model.categoryOnlyMeals),
                         ] else ...[
                           if (model.mainSessions.isNotEmpty) ...[
                             const Padding(
@@ -3928,6 +4102,12 @@ class _CategorySectionCard extends StatelessWidget {
                             ),
                             _buildSessionList(model.extraSessions),
                           ],
+                          if ((model.mainSessions.isNotEmpty ||
+                                  model.extraSessions.isNotEmpty) &&
+                              model.categoryOnlyMeals.isNotEmpty)
+                            const SizedBox(height: 4),
+                          if (model.categoryOnlyMeals.isNotEmpty)
+                            _buildCategoryOnlyList(model.categoryOnlyMeals),
                         ],
                       ],
                     ),

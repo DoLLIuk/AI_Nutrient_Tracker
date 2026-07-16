@@ -2507,6 +2507,175 @@ void main() {
       lessThanOrEqualTo(tester.view.physicalSize.height),
     );
   });
+
+  testWidgets(
+    'late manual breakfast is category-only and has no displayed meal time',
+    (tester) async {
+      final now = DateTime(2026, 4, 2, 14, 0);
+      final controller = PhotoFoodController(
+        repository: _FakeRepository(),
+        photoPicker: _FakePicker(file: null),
+      );
+
+      await tester.pumpWidget(
+        MyApp(
+          controller: controller,
+          skipOnboarding: true,
+          nowProvider: () => now,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('fab-add')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('add-manual')));
+      await tester.pumpAndSettle();
+
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), 'Late Breakfast');
+      await tester.enterText(fields.at(1), '320');
+      await tester.enterText(fields.at(2), '150');
+      await tester.enterText(fields.at(3), '25');
+      await tester.enterText(fields.at(4), '10');
+      await tester.enterText(fields.at(5), '30');
+      await tester.ensureVisible(find.byKey(const Key('meal-type-breakfast')));
+      await tester.tap(find.byKey(const Key('meal-type-breakfast')));
+      await tester.ensureVisible(find.byKey(const Key('manual-meal-submit')));
+      await tester.tap(find.byKey(const Key('manual-meal-submit')));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+        find.byKey(const Key('category-card-breakfast')),
+      );
+      await tester.tap(find.byKey(const Key('category-card-breakfast')));
+      await tester.pumpAndSettle();
+
+      final breakfastContent = find.byKey(
+        const Key('category-content-breakfast'),
+      );
+      expect(
+        find.descendant(
+          of: breakfastContent,
+          matching: find.text('Late Breakfast'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: breakfastContent, matching: find.text('14:00')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('latest-added-card')),
+          matching: find.text('14:00'),
+        ),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'moving a saved meal to another category leaves nearby timed meals intact',
+    (tester) async {
+      final now = DateTime(2026, 4, 2, 13, 0);
+      SharedPreferences.setMockInitialValues({
+        'app.debug.meal_details': false,
+        'app.meals': jsonEncode([
+          _mealJson(
+            requestId: 'caesar',
+            day: now,
+            timestamp: now,
+            kcal: 470,
+            proteinG: 20,
+            mealType: 'lunch',
+            sessionId: 'shared_lunch_session',
+          ),
+          _mealJson(
+            requestId: 'scramble_eggs',
+            day: now,
+            timestamp: now,
+            kcal: 400,
+            proteinG: 24,
+            mealType: 'lunch',
+            sessionId: 'shared_lunch_session',
+          ),
+        ]),
+      });
+      final controller = PhotoFoodController(
+        repository: _FakeRepository(),
+        photoPicker: _FakePicker(file: null),
+      );
+
+      await tester.pumpWidget(
+        MyApp(
+          controller: controller,
+          skipOnboarding: true,
+          nowProvider: () => now,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('category-card-lunch')));
+      await tester.tap(find.byKey(const Key('category-card-lunch')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('category-entry-caesar')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit Meal'), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('meal-type-breakfast')));
+      await tester.tap(find.byKey(const Key('meal-type-breakfast')));
+      await tester.ensureVisible(find.byKey(const Key('manual-meal-submit')));
+      await tester.tap(find.byKey(const Key('manual-meal-submit')));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+        find.byKey(const Key('category-card-breakfast')),
+      );
+      await tester.tap(find.byKey(const Key('category-card-breakfast')));
+      await tester.pumpAndSettle();
+      final breakfastContent = find.byKey(
+        const Key('category-content-breakfast'),
+      );
+      expect(
+        find.descendant(
+          of: breakfastContent,
+          matching: find.byKey(const Key('category-entry-caesar')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: breakfastContent, matching: find.text('13:00')),
+        findsNothing,
+      );
+
+      await tester.ensureVisible(find.byKey(const Key('category-card-lunch')));
+      await tester.tap(find.byKey(const Key('category-card-lunch')));
+      await tester.pumpAndSettle();
+      final lunchContent = find.byKey(const Key('category-content-lunch'));
+      expect(
+        find.descendant(
+          of: lunchContent,
+          matching: find.byKey(const Key('category-entry-caesar')),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: lunchContent,
+          matching: find.byKey(const Key('category-entry-scramble_eggs')),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.pump();
+      final prefs = await SharedPreferences.getInstance();
+      final persistedMeals = jsonDecode(prefs.getString('app.meals')!) as List;
+      final persistedCaesar = persistedMeals
+          .cast<Map<String, dynamic>>()
+          .firstWhere((meal) => meal['requestId'] == 'caesar');
+      expect(persistedCaesar['historyMode'], 'categoryOnly');
+      expect(persistedCaesar['categoryPlacedAt'], isNotNull);
+      expect(persistedCaesar['loggedAt'], now.toIso8601String());
+    },
+  );
 }
 
 final DateTime _fixedNow = DateTime(2026, 4, 2, 13, 0);
