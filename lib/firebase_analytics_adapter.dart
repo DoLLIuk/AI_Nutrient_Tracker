@@ -10,18 +10,25 @@ class FirebaseAnalyticsAdapter implements Analytics {
 
   @override
   void track(AnalyticsEvent event) {
-    final parameters = <String, Object>{};
-    for (final entry in event.properties.entries) {
-      final value = entry.value;
-      switch (value) {
-        case String():
-          parameters[entry.key] = value;
-        case num():
-          parameters[entry.key] = value;
-        case bool():
-          parameters[entry.key] = value ? 1 : 0;
-      }
-    }
-    _analytics.logEvent(name: event.name, parameters: parameters);
+    _analytics.logEvent(
+      name: event.name,
+      parameters: encodeAnalyticsParameters(event),
+    );
   }
+}
+
+Map<String, Object> encodeAnalyticsParameters(AnalyticsEvent event) {
+  final parameters = <String, Object>{};
+  for (final entry in event.properties.entries) {
+    final value = entry.value;
+    switch (value) {
+      case String():
+        parameters[entry.key] = value;
+      case num():
+        parameters[entry.key] = value;
+      case bool():
+        parameters[entry.key] = value ? 1 : 0;
+    }
+  }
+  return parameters;
 }

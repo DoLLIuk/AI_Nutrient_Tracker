@@ -1,279 +1,83 @@
-# Personalized AI Nutrition Coach
+# Proactive AI Nutrition Coach
 
-Status: future product direction, not MVP.
+Status: decided Premium product vision. Shipping is a separate stage after Public v1; it is not Beta v1 or Public v1 scope.
 
-Last updated: 2026-07-06
+Last updated: 2026-07-11
 
-## 1. Purpose
+> [PRODUCT_QUALITY_ROADMAP.md](PRODUCT_QUALITY_ROADMAP.md) defines the release order. This document is the canonical product specification for the first post-Public-v1 Premium Coach stage.
 
-This document defines the future AI nutrition coach concept for AI Calorie Tracker.
+## 1. Product role
 
-The goal is not to copy Fitbit, Google Health, or a broad wearable-based health coach. The goal is to build a nutrition-first assistant that becomes useful because it understands the user's food log, goals, current day, recurring eating patterns, and optional external activity context.
+The Coach is a proactive nutrition agent. It adapts to the user's explicitly provided routine and food history, then initiates a useful contact before a meal instead of waiting for the user to open the app and ask.
 
-The current app must continue to work as a strong food logger without this feature.
+It is a nutrition companion, not a general lifestyle chatbot, workout tracker, medical advisor, clinician replacement, or a dependency of the food-logging core loop.
 
-## 2. Product Positioning
+## 2. Reference scenario
 
-AI Calorie Tracker should remain focused on nutrition.
+1. In future Coach settings, the user explicitly enters an approximate wake time and preferred meal times; they can edit these later.
+2. About 20 minutes before a scheduled meal, the Coach sends an opt-in push notification.
+3. The notification uses recent nutrition patterns and, when sufficient history exists, a concrete recipe/food recommendation with a portion and nutrition values from the verified recipe/food base.
 
-Future coach positioning:
+Reference tone and format:
 
-`a calm personal nutritionist inside the food diary`
+> "Привет! За последние дни тебе не хватало белка. Для продуктивной пятницы подойдёт завтрак: 4 сырника и [...]. Это даст хороший старт дня и заряд энергии до следующего приёма пищи."
 
-The coach should help the user answer:
+The message is warm, motivating, concrete, and never shaming. It recommends a specific meal/portion rather than a vague instruction such as "eat more protein".
 
-- What should I do next today?
-- How should I adjust the next meal?
-- Why am I missing protein or exceeding calories?
-- How can I stay close to my plan without overthinking?
-- How should activity context affect food choices?
+## 3. Locked product decisions
 
-It should not become:
+### Deficit analysis
 
-- a first-party workout tracker;
-- a sleep product;
-- a medical advisor;
-- a general lifestyle chatbot;
-- a wearable dashboard;
-- a replacement for a clinician or registered dietitian.
+- Use a rolling average across the previous 3 days, not a single-day deficit.
+- This reduces false or judgmental reactions to normal one-day variation.
 
-## 3. Product Shape: Today + Ask
+### Dish and nutrition source
 
-The intended UX shape is `Today + Ask`.
+- A verified recipe/food base selects the dish and supplies nutrition values and portions.
+- The LLM may formulate the message tone and phrasing only. It must not invent meals, portions, calories, or macro values.
 
-### Today
+### Schedule source
 
-`Today` is the proactive surface. It should live on or near the Home screen and show personalized nutrition cards.
+- Meal timing comes from explicit manual user input in future Coach settings.
+- The user can edit the schedule at any time.
+- Learned behavioural schedules are outside this version of the Coach.
 
-Each card should:
+### Notification timing and delivery
 
-- be short;
-- be specific;
-- cite the relevant context;
-- recommend one next step;
-- avoid pressure or shame;
-- stay inside nutrition guidance.
+- Target the notification for roughly 20 minutes before the configured meal time.
+- Delivery within a soft ±30–40 minute window is acceptable; exact real-time delivery is not required.
+- Push notifications require separate opt-in, quiet hours, and a clear one-tap disable path.
 
-Example cards:
+### Cold start
 
-- `You have used 68% of today's calories, but only 39% of your protein target. Your next meal should be protein-centered.`
-- `You often skip breakfast and make up calories at night. Today, a small protein-heavy breakfast may help.`
-- `Your imported workout increased energy expenditure. Protein still matters more than simply filling the extra calories.`
+- During the first 3–7 days, before enough history exists, send only a general nutrition nudge without a specific recipe or dish.
+- Example: a general suggestion to add protein today, without pretending to have personalised meal evidence.
 
-### Ask
+### Medical boundary
 
-`Ask` is the user-initiated surface. It lets the user ask nutrition questions using their current app context.
+- Use behavioural nutrition nudges such as "a good start to the day" and "energy until the next meal".
+- Do not make medical, diagnostic, treatment, guaranteed weight-loss, or disease-prevention claims.
+- Implementation must be reviewed against the product disclaimer and safety/copy rules; this document does not override them.
 
-Good questions:
+## 4. Open technical dependency: recipe/food base
 
-- `What should I eat for dinner if I have 520 kcal left?`
-- `I am low on protein. How can I finish the day better?`
-- `Can I have pizza today and still stay within plan?`
-- `Why do I often exceed calories in the evening?`
+The Coach requires a new verified recipe/food base before it can issue personalised dish recommendations with reliable portions and nutrition values.
 
-Ask should not answer broad medical, workout-plan, or mental-health questions beyond safe general redirection.
+The provider, licensing, API, data model, data-quality process, and update ownership are intentionally unresolved technical decisions. Do not select a vendor or implement an integration as part of this vision. Until this dependency is resolved, the Coach can use only the cold-start general-nudge behaviour, not personalised recipe recommendations.
 
-## 4. Tone And Copy Rules
+## 5. Scope and sequence
 
-Tone: calm expert.
+- Beta v1 validates the existing loop: `onboarding → log meals → understand progress → return`.
+- Beta v1 does not add a schedule onboarding question, fake-door demand test, Coach notification, recipe-base integration, or Coach logic.
+- After beta, product and technical scoping may begin, but user-facing Coach shipping remains a separate Premium stage after Public v1.
+- Public v1 still excludes the Coach, user meal schedule, proactive notifications, and the push-notification system.
 
-Rules:
+Reactive chat (`Today + Ask`) is not an approved Coach capability in this vision. It requires a separate product decision and does not follow automatically from proactive notifications.
 
-- be personal, but not intrusive;
-- explain the reason behind recommendations;
-- prefer one clear next step over long advice;
-- avoid guilt, fear, or aggressive coaching;
-- avoid medical claims and diagnoses;
-- admit uncertainty when data is incomplete;
-- tell the user what data influenced the suggestion.
+## 6. Trust, control, and quality gate
 
-Good:
-
-`You are close to today's calorie target, but protein is still low. For the next meal, chicken, cottage cheese, fish, or Greek yogurt would fit better than a high-fat snack.`
-
-Bad:
-
-`You failed today. Fix your diet immediately.`
-
-## 5. Not MVP
-
-Do not include in `Beta v1`:
-
-- full AI chat;
-- LLM dependency for the main logging loop;
-- wearable-based personalization;
-- automatic target changes;
-- long meal plans;
-- diagnosis or treatment advice;
-- broad health coaching;
-- premium-only AI gates.
-
-`Beta v1` should prove the food logging loop before AI becomes a retention layer.
-
-## 6. Near-v1 Foundations
-
-Near `v1`, the app should prepare foundations without shipping a full coach.
-
-Data foundations:
-
-- reliable food log persistence;
-- local date boundaries;
-- meal timestamps;
-- meal type: breakfast, lunch, dinner, snack;
-- entry source: photo, manual, edited;
-- AI uncertainty / manual fallback status;
-- nutrition totals per meal and per day;
-- user goal and daily targets;
-- edit/delete history if feasible;
-- basic repeated patterns, such as low protein, skipped breakfast, late calorie concentration.
-
-Analytics foundations:
-
-- `onboarding_completed`
-- `first_meal_logged`
-- `meal_logged_photo`
-- `meal_logged_manual`
-- `photo_analyze_success`
-- `photo_analyze_fail`
-- `manual_fallback_used`
-- `meal_edited`
-- `day_2_returned`
-- `day_7_returned`
-
-Future coach analytics:
-
-- `coach_card_seen`
-- `coach_card_dismissed`
-- `coach_card_action_taken`
-- `ask_coach_opened`
-- `ask_coach_question_sent`
-- `coach_suggestion_followed`
-
-## 7. Future Context Sources
-
-Core context:
-
-- food log;
-- calorie target;
-- macro targets;
-- current day progress;
-- meal timing;
-- user goal;
-- repeated eating patterns.
-
-Optional future context:
-
-- routine and preferred meal timing;
-- activity calories;
-- workouts or exercise sessions;
-- steps as low-priority context;
-- weight, only with explicit permission;
-- sleep, only if it helps explain eating patterns;
-- weather, only if it affects routine and meal timing.
-
-Possible integrations:
-
-- Android Health Connect;
-- Apple HealthKit;
-- Fitbit/Google Health or another activity provider if public APIs and permissions fit the product.
-
-Integration rule:
-
-Use external health data to improve nutrition advice. Do not turn the product into a general fitness or sleep app.
-
-References:
-
-- Android Health Connect data types: https://developer.android.com/health-and-fitness/health-connect/data-types
-- Apple HealthKit: https://developer.apple.com/health-fitness/
-
-## 8. Safety And Trust
-
-The coach must be conservative.
-
-Hard rules:
-
-- no medical diagnosis;
-- no eating-disorder treatment claims;
-- no extreme calorie-deficit suggestions;
-- no overconfident food-recognition claims;
-- no hidden use of health data;
-- no advice based on health integrations before explicit permission;
-- no automatic goal changes without user confirmation.
-
-Trust rules:
-
-- show why a recommendation appeared;
-- allow dismissing or correcting a suggestion;
-- allow disabling personalization;
-- keep manual logging usable even when AI is unavailable;
-- make fallback states clear.
-
-## 9. Implementation Phases
-
-### Phase 0: Current app
-
-Heuristic Home coach only. No AI nutrition coach.
-
-### Phase 1: Better deterministic coach cards
-
-Use local data to create more useful non-LLM cards:
-
-- low protein;
-- few calories left;
-- over target;
-- empty day;
-- yesterday protein gap;
-- late-day calorie concentration.
-
-### Phase 2: Context package
-
-Create a structured nutrition context object that can feed either deterministic cards or an LLM later.
-
-It should include:
-
-- user goal;
-- day totals;
-- remaining calories/macros;
-- recent meals;
-- simple patterns;
-- optional activity summary.
-
-### Phase 3: Today AI cards
-
-Generate or select a small number of personalized cards. Keep them bounded, explainable, and dismissible.
-
-### Phase 4: Ask Coach
-
-Add user-initiated questions with strict nutrition boundaries and clear safety behavior.
-
-### Phase 5: Integrations-enhanced coaching
-
-Use activity calories and workouts to improve nutrition recommendations when the user has connected a trusted source.
-
-## 10. Open Decisions
-
-Decide later, after `Beta v1` data:
-
-- whether Ask Coach is free, premium, or limited;
-- how many AI cards should appear per day;
-- whether coach memory stores preferences;
-- how suggestions are corrected;
-- which integration ships first;
-- whether coach output is generated on-device, backend-driven, or hybrid;
-- how much historical data should be included in each AI context.
-
-## 11. Success Criteria
-
-The coach is useful only if it changes behavior without adding noise.
-
-Possible success metrics:
-
-- coach card action rate;
-- Ask repeat usage;
-- improved meals logged per active day;
-- improved day-2/day-7 retention;
-- lower evening calorie overshoot;
-- better protein target completion;
-- positive qualitative feedback mentioning personalization.
-
-Do not judge the coach by number of generated messages. Judge it by whether users make better nutrition decisions and return.
+- The user understands which routine and nutrition context informed a notification.
+- Every notification has a respectful tone, an opt-out path, and no hidden use of health data.
+- The user can edit schedule, quiet hours, and notification preferences without losing access to manual logging or the diary.
+- Before shipping, validate consent, delivery reliability, recipe-base quality, generated-copy safety, dismiss/disable behaviour, and any recurring safety incidents.
+- Evaluate usefulness through notification open/dismiss/disable behaviour, meal logging, eligible D2 return, nutrition-target completion, and qualitative feedback—not message volume alone.

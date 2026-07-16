@@ -10,12 +10,16 @@ class ProfilePage extends StatelessWidget {
   final OnboardingResult? onboardingResult;
   final VoidCallback onResetOnboarding;
   final Future<void> Function() onEditProfile;
+  final bool showDebugMealDetails;
+  final ValueChanged<bool> onDebugMealDetailsChanged;
 
   const ProfilePage({
     super.key,
     this.onboardingResult,
     required this.onResetOnboarding,
     required this.onEditProfile,
+    required this.showDebugMealDetails,
+    required this.onDebugMealDetailsChanged,
   });
 
   @override
@@ -231,6 +235,8 @@ class ProfilePage extends StatelessWidget {
                       onboardingResult: result,
                       onResetOnboarding: onResetOnboarding,
                       onEditProfile: onEditProfile,
+                      showDebugMealDetails: showDebugMealDetails,
+                      onDebugMealDetailsChanged: onDebugMealDetailsChanged,
                     ),
                   ),
                 );

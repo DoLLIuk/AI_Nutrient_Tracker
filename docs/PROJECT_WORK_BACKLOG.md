@@ -2,9 +2,11 @@
 
 Status: working task list for making the project easier to build on.
 
-Last updated: 2026-07-09
+Last updated: 2026-07-16
 
 This document lists the main gaps to close before implementing larger features such as AI nutrition coach, integrations, monetization, public launch, accounts, or sync.
+
+For stage ordering, quality gates, Public v1 scope, Free/Premium policy, and account/restore decisions, use [PRODUCT_QUALITY_ROADMAP.md](PRODUCT_QUALITY_ROADMAP.md) as the canonical roadmap. This file stays intentionally short and practical.
 
 It is intentionally practical. It is not a product pitch and not a detailed engineering spec.
 
@@ -25,6 +27,7 @@ It is intentionally practical. It is not a product pitch and not a detailed engi
 - Make manual fallback obvious and usable.
 - Make Home screen answer the basic question: "How is my day going?"
 - Make edit/delete behavior feel safe and predictable.
+- [ ] Implement delayed manual logging and safe category moves according to [MEAL_HISTORY_BACKFILL_PLAN.md](MEAL_HISTORY_BACKFILL_PLAN.md), without letting a manual category override move nearby timed meals.
 - Make empty states useful instead of looking unfinished.
 
 ## 3. Data And Persistence
@@ -45,7 +48,7 @@ It is intentionally practical. It is not a product pitch and not a detailed engi
 - Track photo success/failure.
 - Track manual fallback usage.
 - Track meals logged per active day.
-- Track day-2 and day-7 return behavior.
+- Track the app-open denominator, onboarding funnel, 168-hour activation, and eligible D2 return; define day-7 separately before using it for decisions.
 - Keep qualitative feedback alongside numbers.
 
 ## 5. Code Organization

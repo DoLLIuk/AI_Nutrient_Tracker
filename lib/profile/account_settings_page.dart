@@ -3,17 +3,43 @@ import 'package:flutter/material.dart';
 import '../onboarding.dart';
 import 'profile_labels.dart';
 
-class AccountSettingsPage extends StatelessWidget {
+class AccountSettingsPage extends StatefulWidget {
   final OnboardingResult? onboardingResult;
   final VoidCallback onResetOnboarding;
   final Future<void> Function() onEditProfile;
+  final bool showDebugMealDetails;
+  final ValueChanged<bool> onDebugMealDetailsChanged;
 
   const AccountSettingsPage({
     super.key,
     required this.onboardingResult,
     required this.onResetOnboarding,
     required this.onEditProfile,
+    required this.showDebugMealDetails,
+    required this.onDebugMealDetailsChanged,
   });
+
+  @override
+  State<AccountSettingsPage> createState() => _AccountSettingsPageState();
+}
+
+class _AccountSettingsPageState extends State<AccountSettingsPage> {
+  late bool _showDebugMealDetails;
+
+  @override
+  void initState() {
+    super.initState();
+    _showDebugMealDetails = widget.showDebugMealDetails;
+  }
+
+  OnboardingResult? get onboardingResult => widget.onboardingResult;
+  VoidCallback get onResetOnboarding => widget.onResetOnboarding;
+  Future<void> Function() get onEditProfile => widget.onEditProfile;
+
+  void _setDebugMealDetails(bool enabled) {
+    setState(() => _showDebugMealDetails = enabled);
+    widget.onDebugMealDetailsChanged(enabled);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +149,28 @@ class AccountSettingsPage extends StatelessWidget {
                   title: 'Local-only beta',
                   subtitle:
                       'Your onboarding and meal history stay on this device. Accounts and cloud sync are not available yet.',
+                ),
+              ),
+              const SizedBox(height: 14),
+              const _SettingsSectionTitle('Beta tools'),
+              _SettingsCard(
+                child: SwitchListTile(
+                  key: const Key('debug-meal-details-switch'),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  title: const Text(
+                    'Debug meal details',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF2A3353),
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Show technical meal details before editing',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF8A91A8)),
+                  ),
+                  value: _showDebugMealDetails,
+                  onChanged: _setDebugMealDetails,
                 ),
               ),
               const SizedBox(height: 14),

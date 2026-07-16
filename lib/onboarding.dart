@@ -63,6 +63,8 @@ class OnboardingResult {
 class OnboardingFlow extends StatefulWidget {
   final Future<void> Function(OnboardingResult result) onCompleted;
   final ValueChanged<OnboardingDraft>? onDraftChanged;
+  final VoidCallback? onStarted;
+  final ValueChanged<int>? onStepViewed;
   final OnboardingDraft? initialDraft;
   final bool popOnBackAtEntryStep;
 
@@ -70,6 +72,8 @@ class OnboardingFlow extends StatefulWidget {
     super.key,
     required this.onCompleted,
     this.onDraftChanged,
+    this.onStarted,
+    this.onStepViewed,
     this.initialDraft,
     this.popOnBackAtEntryStep = false,
   });
@@ -97,6 +101,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   WeightUnit _weightUnit = WeightUnit.kg;
   String? _basicProfileError;
   bool _isCompleting = false;
+  int? _lastReportedStep;
 
   @override
   void initState() {
@@ -109,6 +114,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     _inchesController.addListener(_notifyDraftChanged);
     _weightController.addListener(_notifyDraftChanged);
     _notifyDraftChanged();
+    _reportCurrentStepIfNeeded();
   }
 
   void _restoreDraft(OnboardingDraft? draft) {
@@ -155,6 +161,17 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     _notifyDraftChanged();
   }
 
+  void _reportCurrentStepIfNeeded() {
+    if (_lastReportedStep == _step) return;
+    _lastReportedStep = _step;
+    widget.onStepViewed?.call(_step);
+  }
+
+  void _startOnboarding() {
+    widget.onStarted?.call();
+    _nextStep();
+  }
+
   @override
   void dispose() {
     _ageController.dispose();
@@ -166,11 +183,17 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   void _nextStep() {
-    if (_step < 6) _setStateAndNotify(() => _step += 1);
+    if (_step < 6) {
+      _setStateAndNotify(() => _step += 1);
+      _reportCurrentStepIfNeeded();
+    }
   }
 
   void _previousStep() {
-    if (_step > 0) _setStateAndNotify(() => _step -= 1);
+    if (_step > 0) {
+      _setStateAndNotify(() => _step -= 1);
+      _reportCurrentStepIfNeeded();
+    }
   }
 
   Future<void> _completeOnboarding() async {
@@ -307,7 +330,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 180),
         child: switch (_step) {
-          0 => _WelcomeScreen(onContinue: _nextStep),
+          0 => _WelcomeScreen(onContinue: _startOnboarding),
           1 => _StepScaffold(
             key: const ValueKey('goal-step'),
             step: 1,

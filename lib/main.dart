@@ -69,10 +69,11 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   static const _onboardingResultKey = 'app.onboarding.result';
   static const _onboardingDraftKey = 'app.onboarding.draft';
   static const _mealsKey = 'app.meals';
+  static const _debugMealDetailsKey = 'app.debug.meal_details';
 
   late final PhotoFoodController _controller;
   late final bool _ownsController;
@@ -81,7 +82,9 @@ class _MyAppState extends State<MyApp> {
   OnboardingResult? _onboardingResult;
   OnboardingDraft? _onboardingDraft;
   List<_MealEntry> _persistedMeals = const [];
+  bool _showDebugMealDetails = kDebugMode;
   bool _isHydrated = false;
+  bool _wasBackgrounded = false;
   Future<void> _persistQueue = Future<void>.value();
 
   @override
@@ -89,6 +92,8 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     _onboardingResult = widget.onboardingResult;
     _analytics = widget.analytics ?? const DebugAnalytics();
+    _analytics.track(AnalyticsEvent(AnalyticsEvents.appOpened));
+    WidgetsBinding.instance.addObserver(this);
 
     if (widget.controller != null) {
       _controller = widget.controller!;
@@ -129,6 +134,7 @@ class _MyAppState extends State<MyApp> {
       final resultRaw = prefs.getString(_onboardingResultKey);
       final draftRaw = prefs.getString(_onboardingDraftKey);
       final mealsRaw = prefs.getString(_mealsKey);
+      final debugMealDetails = prefs.getBool(_debugMealDetailsKey);
 
       final restoredResult =
           widget.onboardingResult ?? _decodeOnboardingResult(resultRaw);
@@ -139,6 +145,7 @@ class _MyAppState extends State<MyApp> {
         _onboardingResult = restoredResult;
         _onboardingDraft = restoredDraft;
         _persistedMeals = restoredMeals;
+        _showDebugMealDetails = debugMealDetails ?? kDebugMode;
         _isHydrated = true;
       });
       if (kDebugMode) {
@@ -181,6 +188,7 @@ class _MyAppState extends State<MyApp> {
       _mealsKey,
       jsonEncode(_persistedMeals.map((m) => m.toJson()).toList()),
     );
+    await prefs.setBool(_debugMealDetailsKey, _showDebugMealDetails);
   }
 
   Future<void> _enqueuePersistState({required String reason}) {
@@ -278,16 +286,19 @@ class _MyAppState extends State<MyApp> {
     _enqueuePersistState(reason: 'draft_changed');
   }
 
+  void _setDebugMealDetails(bool enabled) {
+    if (_showDebugMealDetails == enabled) return;
+    setState(() => _showDebugMealDetails = enabled);
+    _enqueuePersistState(reason: 'debug_meal_details_changed');
+  }
+
   void _handleMealsChanged(List<_MealEntry> meals) {
     final previousMeals = _persistedMeals;
     final previousIds = previousMeals.map((meal) => meal.requestId).toSet();
-    final previousSessionIds = previousMeals
-        .map((meal) => meal.sessionId)
-        .where((sessionId) => sessionId.isNotEmpty)
-        .toSet();
-    final addedMeals = meals
-        .where((meal) => !previousIds.contains(meal.requestId))
-        .toList(growable: false);
+    final addedMeals =
+        meals.where((meal) => !previousIds.contains(meal.requestId)).toList()
+          ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    final knownMealIds = Set<String>.from(previousIds);
 
     _persistedMeals = List<_MealEntry>.from(meals);
     _enqueuePersistState(reason: 'meals_changed');
@@ -296,18 +307,28 @@ class _MyAppState extends State<MyApp> {
       final meal = addedMeals[index];
       final now = widget.nowProvider?.call() ?? DateTime.now();
       final dayOffset = _dateOnly(meal.day).difference(_dateOnly(now)).inDays;
-      _analytics.track(
-        AnalyticsEvent(
-          AnalyticsEvents.mealLogged,
-          properties: {
-            'source': meal.origin.name,
-            'day_offset': dayOffset,
-            'creates_new_session':
-                previousMeals.isEmpty ||
-                !previousSessionIds.contains(meal.sessionId),
-          },
-        ),
+      final createsNewSession = !meals.any(
+        (existingMeal) =>
+            existingMeal.sessionId == meal.sessionId &&
+            knownMealIds.contains(existingMeal.requestId),
       );
+      final properties = <String, Object?>{
+        'source': meal.origin.name,
+        'day_offset': dayOffset,
+        'creates_new_session': createsNewSession,
+      };
+      _analytics.track(
+        AnalyticsEvent(AnalyticsEvents.mealLogged, properties: properties),
+      );
+      if (!createsNewSession) {
+        _analytics.track(
+          AnalyticsEvent(
+            AnalyticsEvents.mealLoggedInExistingSession,
+            properties: {'source': meal.origin.name, 'day_offset': dayOffset},
+          ),
+        );
+      }
+      knownMealIds.add(meal.requestId);
       if (previousMeals.isEmpty && index == 0) {
         _analytics.track(AnalyticsEvent(AnalyticsEvents.firstMealLogged));
       }
@@ -323,7 +344,23 @@ class _MyAppState extends State<MyApp> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      _wasBackgrounded = true;
+      return;
+    }
+
+    if (state == AppLifecycleState.resumed && _wasBackgrounded) {
+      _wasBackgrounded = false;
+      _analytics.track(AnalyticsEvent(AnalyticsEvents.appOpened));
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_ownsController) {
       _controller.dispose();
     }
@@ -353,10 +390,21 @@ class _MyAppState extends State<MyApp> {
               onEditProfile: _openProfileEditor,
               nowProvider: widget.nowProvider,
               photoAnalysisAvailable: _photoAnalysisAvailable,
+              showDebugMealDetails: _showDebugMealDetails,
+              onDebugMealDetailsChanged: _setDebugMealDetails,
             )
           : OnboardingFlow(
               initialDraft: _onboardingDraft,
               onDraftChanged: _handleOnboardingDraftChanged,
+              onStarted: () => _analytics.track(
+                AnalyticsEvent(AnalyticsEvents.onboardingStarted),
+              ),
+              onStepViewed: (step) => _analytics.track(
+                AnalyticsEvent(
+                  AnalyticsEvents.onboardingStepViewed,
+                  properties: {'step': step},
+                ),
+              ),
               onCompleted: _handleOnboardingCompleted,
             ),
     );
@@ -385,6 +433,8 @@ class _AppShell extends StatefulWidget {
   final DateTime Function()? nowProvider;
   final Analytics analytics;
   final bool photoAnalysisAvailable;
+  final bool showDebugMealDetails;
+  final ValueChanged<bool> onDebugMealDetailsChanged;
 
   const _AppShell({
     required this.controller,
@@ -396,6 +446,8 @@ class _AppShell extends StatefulWidget {
     required this.analytics,
     this.nowProvider,
     required this.photoAnalysisAvailable,
+    required this.showDebugMealDetails,
+    required this.onDebugMealDetailsChanged,
   });
 
   @override
@@ -422,11 +474,14 @@ class _AppShellState extends State<_AppShell> {
             nowProvider: widget.nowProvider,
             analytics: widget.analytics,
             photoAnalysisAvailable: widget.photoAnalysisAvailable,
+            showDebugMealDetails: widget.showDebugMealDetails,
           ),
           ProfilePage(
             onboardingResult: widget.onboardingResult,
             onResetOnboarding: widget.onResetOnboarding,
             onEditProfile: () => widget.onEditProfile(context),
+            showDebugMealDetails: widget.showDebugMealDetails,
+            onDebugMealDetailsChanged: widget.onDebugMealDetailsChanged,
           ),
         ],
       ),
@@ -479,6 +534,7 @@ class _CaloriesHomePage extends StatefulWidget {
   final DateTime Function()? nowProvider;
   final Analytics analytics;
   final bool photoAnalysisAvailable;
+  final bool showDebugMealDetails;
 
   const _CaloriesHomePage({
     super.key,
@@ -489,6 +545,7 @@ class _CaloriesHomePage extends StatefulWidget {
     this.nowProvider,
     required this.analytics,
     required this.photoAnalysisAvailable,
+    required this.showDebugMealDetails,
   });
 
   @override
@@ -886,6 +943,12 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       );
     }
 
+    void clearNewMealZeroValue(TextEditingController controller) {
+      if (editingMeal == null && controller.text == '0.0') {
+        updateControllerText(controller, '');
+      }
+    }
+
     void syncControllersFromDraft({_MealEditField? preserveField}) {
       if (isApplyingDraft) return;
       isApplyingDraft = true;
@@ -1187,6 +1250,8 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                 label: 'Calories',
                                 hint: numericHint(editingMeal?.kcal, '0'),
                                 numeric: true,
+                                onTapDown: () =>
+                                    clearNewMealZeroValue(kcalCtrl),
                                 isLocked: formDraft.isLocked(
                                   _MealEditField.calories,
                                 ),
@@ -1217,6 +1282,8 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                         '250',
                                       ),
                                       numeric: true,
+                                      onTapDown: () =>
+                                          clearNewMealZeroValue(gramsCtrl),
                                       isLocked: formDraft.isLocked(
                                         _MealEditField.weight,
                                       ),
@@ -1246,6 +1313,8 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                         '20',
                                       ),
                                       numeric: true,
+                                      onTapDown: () =>
+                                          clearNewMealZeroValue(proteinCtrl),
                                       isLocked: formDraft.isLocked(
                                         _MealEditField.protein,
                                       ),
@@ -1276,6 +1345,8 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                       label: 'Fat (g)',
                                       hint: numericHint(editingMeal?.fatG, '8'),
                                       numeric: true,
+                                      onTapDown: () =>
+                                          clearNewMealZeroValue(fatCtrl),
                                       isLocked: formDraft.isLocked(
                                         _MealEditField.fat,
                                       ),
@@ -1305,6 +1376,8 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                         '30',
                                       ),
                                       numeric: true,
+                                      onTapDown: () =>
+                                          clearNewMealZeroValue(carbsCtrl),
                                       isLocked: formDraft.isLocked(
                                         _MealEditField.carbs,
                                       ),
@@ -1683,6 +1756,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     VoidCallback? onDoubleTapLock,
     VoidCallback? onUnlock,
     ValueChanged<String>? onChanged,
+    VoidCallback? onTapDown,
   }) {
     final borderColor = isLocked
         ? const Color(0xFFFACC15)
@@ -1701,49 +1775,52 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              Container(
-                key: fieldKeySuffix == null
-                    ? null
-                    : Key('meal-input-$fieldKeySuffix'),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF2F4F8),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: borderColor,
-                    width: isLocked ? 2 : 0,
+              Listener(
+                onPointerDown: onTapDown == null ? null : (_) => onTapDown(),
+                child: Container(
+                  key: fieldKeySuffix == null
+                      ? null
+                      : Key('meal-input-$fieldKeySuffix'),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF2F4F8),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: borderColor,
+                      width: isLocked ? 2 : 0,
+                    ),
                   ),
-                ),
-                child: TextField(
-                  controller: controller,
-                  onChanged: onChanged,
-                  keyboardType: numeric
-                      ? const TextInputType.numberWithOptions(decimal: true)
-                      : TextInputType.text,
-                  decoration: InputDecoration(
-                    hintText: hint,
-                    filled: true,
-                    fillColor: Colors.transparent,
-                    contentPadding: EdgeInsets.fromLTRB(
-                      14,
-                      14,
-                      isLocked ? 40 : 14,
-                      14,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(
-                        color: isLocked
-                            ? const Color(0xFFFACC15)
-                            : const Color(0xFF7E9EF1),
-                        width: 2,
+                  child: TextField(
+                    controller: controller,
+                    onChanged: onChanged,
+                    keyboardType: numeric
+                        ? const TextInputType.numberWithOptions(decimal: true)
+                        : TextInputType.text,
+                    decoration: InputDecoration(
+                      hintText: hint,
+                      filled: true,
+                      fillColor: Colors.transparent,
+                      contentPadding: EdgeInsets.fromLTRB(
+                        14,
+                        14,
+                        isLocked ? 40 : 14,
+                        14,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: isLocked
+                              ? const Color(0xFFFACC15)
+                              : const Color(0xFF7E9EF1),
+                          width: 2,
+                        ),
                       ),
                     ),
                   ),
@@ -2261,6 +2338,10 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
   }
 
   void _showMealDetails(_MealEntry meal) {
+    if (!widget.showDebugMealDetails) {
+      _showManualMealSheet(editingMeal: meal);
+      return;
+    }
     showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -3320,7 +3401,7 @@ class _CoachCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        'Coach',
+                        'Today\'s tip',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,

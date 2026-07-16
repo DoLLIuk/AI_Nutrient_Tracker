@@ -2,6 +2,8 @@
 
 Updated: 2026-07-06
 
+> Note: [docs/PRODUCT_QUALITY_ROADMAP.md](../docs/PRODUCT_QUALITY_ROADMAP.md) now defines the canonical stage order and quality gates through Public v1. This document remains useful for strategic and public-planning context; the master roadmap wins if they differ.
+
 This document outlines a practical path from the current app to `Beta v1`, early users, and a public launch. The goal is not just to publish the app in the stores. The goal is to prepare the product, audience, feedback loop, and project story before launch.
 
 ## 1. Strategy
@@ -77,6 +79,8 @@ Metrics to watch:
 
 Goal: launch publicly after the beta version survives real usage.
 
+The exact scope, including account restore and Premium subscriptions, is defined in the master roadmap and is intentionally not duplicated here.
+
 Before launch:
 
 - prepare store screenshots and a short demo video;
@@ -100,10 +104,8 @@ Possible directions:
 - personalized AI nutrition coach;
 - integrations with Apple Health, Android Health Connect, Fitbit/Google Health, or other activity sources;
 - push reminders;
-- expanded history;
-- subscription and limits;
-- stronger local database;
-- accounts and sync.
+- live multi-device sync;
+- stronger local database.
 
 Important: monetization and AI coaching should not be used to rescue a weak core loop. They should strengthen a food diary that is already useful.
 
@@ -276,7 +278,7 @@ Do not decide too early:
 - exact subscription price;
 - complex paywall strategy;
 - full AI coach;
-- accounts and cloud sync;
+- live multi-device sync;
 - multiple health platform integrations at once;
 - partnerships before beta.
 

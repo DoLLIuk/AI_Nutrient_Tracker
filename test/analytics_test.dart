@@ -16,9 +16,16 @@ void main() {
   });
 
   test('beta core-loop event names stay stable', () {
+    expect(AnalyticsEvents.appOpened, 'app_opened');
+    expect(AnalyticsEvents.onboardingStarted, 'onboarding_started');
+    expect(AnalyticsEvents.onboardingStepViewed, 'onboarding_step_viewed');
     expect(AnalyticsEvents.onboardingCompleted, 'onboarding_completed');
     expect(AnalyticsEvents.firstMealLogged, 'first_meal_logged');
     expect(AnalyticsEvents.mealLogged, 'meal_logged');
+    expect(
+      AnalyticsEvents.mealLoggedInExistingSession,
+      'meal_logged_in_existing_session',
+    );
     expect(AnalyticsEvents.photoAnalysisSucceeded, 'photo_analysis_succeeded');
     expect(AnalyticsEvents.photoAnalysisFailed, 'photo_analysis_failed');
     expect(AnalyticsEvents.manualFallbackUsed, 'manual_fallback_used');

@@ -4,6 +4,8 @@ Status: post-v1 strategy and future product direction.
 
 Last updated: 2026-07-06
 
+> Stage order and quality gates through Public v1 are now governed by [PRODUCT_QUALITY_ROADMAP.md](PRODUCT_QUALITY_ROADMAP.md). This document remains the detailed strategy for work after that release; the master roadmap wins if they differ.
+
 ## 1. Purpose
 
 This document collects future product goals for AI Calorie Tracker after the core food logging loop is validated.
@@ -22,56 +24,9 @@ Do not expand into a broad health app too early. Workouts, sleep, weather, and w
 
 ## 3. Release Horizon
 
-### Beta v1
+The exact Beta v1 and Public v1 scope is maintained only in [PRODUCT_QUALITY_ROADMAP.md](PRODUCT_QUALITY_ROADMAP.md). In particular, Public v1 includes account backup/restore, subscriptions, Premium history, and weekly reports; it does not include the full AI coach.
 
-Goal: validate the core loop with real users.
-
-Must prove:
-
-- onboarding completion;
-- first meal logged;
-- meals logged per active day;
-- day-2/day-7 return behavior;
-- photo flow reliability;
-- manual fallback usability;
-- Home screen clarity.
-
-Do not depend on:
-
-- subscription;
-- full AI coach;
-- push reminders;
-- accounts;
-- cloud sync;
-- health integrations.
-
-### Public v1
-
-Goal: release a stable, honest food logging product.
-
-Likely additions:
-
-- production configuration workflow;
-- privacy policy and disclaimer;
-- basic analytics;
-- crash/error monitoring;
-- polished store screenshots;
-- landing/project page;
-- improved beta-feedback issues.
-
-### Post-v1
-
-Goal: build retention and differentiation on top of a working diary.
-
-Candidate areas:
-
-- personalized AI nutrition coach;
-- activity-calorie integrations;
-- reminders and light scheduling;
-- richer history;
-- premium features;
-- account/sync;
-- stronger local storage.
+This document starts after Public v1. The first post-v1 Premium direction is a personalized AI nutrition coach with optional user-provided routine and coach reminders. Health integrations, live multi-device sync, and broader fitness data remain later candidates.
 
 ## 4. Future AI Nutrition Coach
 
@@ -166,7 +121,7 @@ Prerequisites:
 
 - stable beta;
 - first user testimonials;
-- day-2/day-7 retention signal;
+- eligible D2 app/logging return signal; add day-7 only after its elapsed-time window and denominator are defined;
 - users logging more than one meal per active day;
 - clear understanding of which feature creates willingness to pay.
 
@@ -174,10 +129,10 @@ Possible premium features:
 
 - higher photo-analysis limits;
 - extended history;
-- AI nutrition coach;
+- personalized AI nutrition coach, optional routine, and coach reminders after Public v1;
 - integrations-enhanced insights;
 - advanced trends;
-- account sync later.
+- live multi-device sync later.
 
 Avoid early mistakes:
 
@@ -190,10 +145,12 @@ Avoid early mistakes:
 
 Minimum beta analytics:
 
+- `app_opened`
+- `onboarding_started`
+- `onboarding_step_viewed`
 - `onboarding_completed`
 - `first_meal_logged`
-- `meal_logged_photo`
-- `meal_logged_manual`
+- `meal_logged` with `source`
 - `photo_analyze_success`
 - `photo_analyze_fail`
 - `manual_fallback_used`
@@ -297,7 +254,7 @@ Delay until after beta evidence:
 - paywall frequency;
 - full AI coach scope;
 - first health integration;
-- account/sync architecture;
+- live multi-device sync architecture;
 - public launch timing;
 - sponsor pitch.
 

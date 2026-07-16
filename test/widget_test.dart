@@ -34,17 +34,91 @@ void main() {
     expect(find.text('Choose from gallery'), findsOneWidget);
   });
 
-  testWidgets('runs in manual local-only mode without API configuration', (tester) async {
+  testWidgets('runs in manual local-only mode without API configuration', (
+    tester,
+  ) async {
     await tester.pumpWidget(const MyApp(skipOnboarding: true));
     await tester.pumpAndSettle();
+
     await tester.tap(find.byKey(const Key('fab-add')));
     await tester.pumpAndSettle();
+
     expect(find.byKey(const Key('photo-analysis-unavailable')), findsOneWidget);
     expect(find.text('Take photo'), findsNothing);
     expect(find.text('Choose from gallery'), findsNothing);
     expect(find.byKey(const Key('add-manual')), findsOneWidget);
   });
-  testWidgets('manual logging records first-meal core-loop events', (
+
+  testWidgets('records app-open and onboarding funnel events', (tester) async {
+    final analytics = _RecordingAnalytics();
+    final controller = PhotoFoodController(
+      repository: _FakeRepository(),
+      photoPicker: _FakePicker(file: null),
+    );
+
+    await tester.pumpWidget(
+      MyApp(controller: controller, analytics: analytics),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      analytics.events.map((event) => event.name),
+      containsAll(<String>[
+        AnalyticsEvents.appOpened,
+        AnalyticsEvents.onboardingStepViewed,
+      ]),
+    );
+    expect(
+      analytics.events
+          .firstWhere(
+            (event) => event.name == AnalyticsEvents.onboardingStepViewed,
+          )
+          .properties,
+      {'step': 0},
+    );
+
+    await tester.tap(find.text('Get started'));
+    await tester.pumpAndSettle();
+
+    expect(
+      analytics.events.map((event) => event.name),
+      contains(AnalyticsEvents.onboardingStarted),
+    );
+    expect(
+      analytics.events
+          .where((event) => event.name == AnalyticsEvents.onboardingStepViewed)
+          .last
+          .properties,
+      {'step': 1},
+    );
+  });
+
+  testWidgets('records an app open when returning from the background', (
+    tester,
+  ) async {
+    final analytics = _RecordingAnalytics();
+    final controller = PhotoFoodController(
+      repository: _FakeRepository(),
+      photoPicker: _FakePicker(file: null),
+    );
+
+    await tester.pumpWidget(
+      MyApp(controller: controller, analytics: analytics),
+    );
+    await tester.pumpAndSettle();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+
+    expect(
+      analytics.events.where(
+        (event) => event.name == AnalyticsEvents.appOpened,
+      ),
+      hasLength(2),
+    );
+  });
+
+  testWidgets('manual logging records core-loop and same-session events', (
     tester,
   ) async {
     final analytics = _RecordingAnalytics();
@@ -84,6 +158,38 @@ void main() {
           .firstWhere((event) => event.name == AnalyticsEvents.mealLogged)
           .properties,
       {'source': 'manual', 'day_offset': 0, 'creates_new_session': true},
+    );
+
+    await tester.tap(find.byKey(const Key('fab-add')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('add-manual')));
+    await tester.pumpAndSettle();
+
+    final secondFields = find.byType(TextField);
+    await tester.enterText(secondFields.at(0), 'Second test meal');
+    await tester.enterText(secondFields.at(2), '250');
+    await tester.enterText(secondFields.at(3), '25');
+    await tester.enterText(secondFields.at(4), '10');
+    await tester.enterText(secondFields.at(5), '30');
+    await tester.ensureVisible(find.text('Add Meal').last);
+    await tester.tap(find.text('Add Meal').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      analytics.events
+          .where((event) => event.name == AnalyticsEvents.mealLogged)
+          .last
+          .properties,
+      {'source': 'manual', 'day_offset': 0, 'creates_new_session': false},
+    );
+    expect(
+      analytics.events
+          .lastWhere(
+            (event) =>
+                event.name == AnalyticsEvents.mealLoggedInExistingSession,
+          )
+          .properties,
+      {'source': 'manual', 'day_offset': 0},
     );
   });
 
@@ -567,8 +673,11 @@ void main() {
 
     expect(find.text('Profile settings'), findsOneWidget);
     expect(find.text('DATA'), findsOneWidget);
+    expect(find.text('BETA TOOLS'), findsOneWidget);
     expect(find.text('ONBOARDING'), findsOneWidget);
     expect(find.text('Local-only beta'), findsOneWidget);
+    expect(find.text('Debug meal details'), findsOneWidget);
+    expect(find.byKey(const Key('debug-meal-details-switch')), findsOneWidget);
   });
 
   testWidgets(
@@ -595,6 +704,8 @@ void main() {
 
       expect(coachY, greaterThan(consumedY));
       expect(coachY, lessThan(proteinY));
+      expect(find.text('Today\'s tip'), findsOneWidget);
+      expect(find.text('Coach'), findsNothing);
       expect(find.text('Start your day'), findsOneWidget);
       expect(
         find.text('Log your first meal to shape the rest of today'),
@@ -1361,6 +1472,7 @@ void main() {
   testWidgets(
     'editing meal grams recalculates kcal and macros proportionally',
     (tester) async {
+      SharedPreferences.setMockInitialValues({'app.debug.meal_details': false});
       final controller = PhotoFoodController(
         repository: _FakeRepository(),
         photoPicker: _FakePicker(file: null),
@@ -1389,9 +1501,8 @@ void main() {
       await tester.ensureVisible(find.text('Test Meal'));
       await tester.tap(find.text('Test Meal'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Edit'));
-      await tester.tap(find.text('Edit'));
-      await tester.pumpAndSettle();
+      expect(find.text('Edit Meal'), findsOneWidget);
+      expect(find.text('Confidence: 100%'), findsNothing);
 
       final editFields = find.byType(TextField);
       await tester.enterText(editFields.at(2), '100');
@@ -1402,10 +1513,58 @@ void main() {
       await tester.ensureVisible(find.text('Test Meal'));
       await tester.tap(find.text('Test Meal'));
       await tester.pumpAndSettle();
-      expect(find.text('Calories: 124.0 kcal'), findsOneWidget);
-      expect(find.text('Protein: 10.0 g'), findsOneWidget);
-      expect(find.text('Fat: 4.0 g'), findsOneWidget);
-      expect(find.text('Carbs: 12.0 g'), findsOneWidget);
+      final updatedFields = find.byType(TextField);
+      expect(
+        tester.widget<TextField>(updatedFields.at(1)).controller!.text,
+        '124.0',
+      );
+      expect(
+        tester.widget<TextField>(updatedFields.at(3)).controller!.text,
+        '10.0',
+      );
+      expect(
+        tester.widget<TextField>(updatedFields.at(4)).controller!.text,
+        '4.0',
+      );
+      expect(
+        tester.widget<TextField>(updatedFields.at(5)).controller!.text,
+        '12.0',
+      );
+    },
+  );
+  testWidgets(
+    'new manual meal clears auto-filled zeroes when numeric fields receive focus',
+    (tester) async {
+      final controller = PhotoFoodController(
+        repository: _FakeRepository(),
+        photoPicker: _FakePicker(file: null),
+      );
+
+      await tester.pumpWidget(
+        MyApp(controller: controller, skipOnboarding: true),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('fab-add')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('add-manual')));
+      await tester.pumpAndSettle();
+
+      Finder input(String suffix) => find.descendant(
+        of: find.byKey(Key('meal-input-$suffix')),
+        matching: find.byType(TextField),
+      );
+
+      await tester.enterText(input('calories'), '400');
+      await tester.pump();
+
+      for (final suffix in ['weight', 'protein', 'fat', 'carbs']) {
+        final field = input(suffix);
+        await tester.ensureVisible(field);
+        expect(tester.widget<TextField>(field).controller!.text, '0.0');
+        await tester.tap(field);
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(tester.widget<TextField>(field).controller!.text, isEmpty);
+      }
     },
   );
   testWidgets('editing meal protein saves manual macro override', (

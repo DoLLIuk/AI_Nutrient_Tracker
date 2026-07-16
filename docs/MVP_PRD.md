@@ -119,14 +119,14 @@ AI Food Logger — это приложение, которое делает ло
 - дневной прогресс Б/Ж/У;
 - список приёмов пищи за выбранный день;
 - latest added / последняя добавленная еда;
-- простой coach block как вспомогательная подсказка.
+- короткую deterministic `Today’s tip` как вспомогательную подсказку.
 
-Coach block в MVP:
+`Today’s tip` в MVP:
 - короткий;
 - контекстный;
 - не центральное обещание продукта;
 - не отдельный сценарий и не отдельный экран.
-- deterministic/heuristic, not LLM-driven.
+- deterministic/heuristic, not LLM-driven and not an AI Coach.
 
 ### 8.3 Логирование еды
 
@@ -209,7 +209,7 @@ Coach block в MVP:
 
 - калории;
 - Б/Ж/У;
-- coach hint;
+- deterministic daily tip;
 - latest added;
 - список дневных записей;
 - CTA на добавление еды.
@@ -257,8 +257,8 @@ Coach block в MVP:
 - onboarding completion rate;
 - first meal logged rate;
 - meals logged per active day;
-- day-2 retention;
-- day-7 retention;
+- D2 app/logging return as defined in [ANALYTICS.md](ANALYTICS.md): an eligible activated user returns 18–42 elapsed hours after activation;
+- day-7 retention only after a separate elapsed-time window and denominator are approved; it is not a Beta v1 decision metric yet;
 - photo flow completion rate;
 - manual fallback rate.
 
@@ -282,7 +282,7 @@ Coach block в MVP:
 - Пользователи готовы регулярно логировать еду, если это быстрее и проще, чем в обычных calorie trackers.
 - Фото-флоу повышает вероятность первого успешного логирования.
 - Даже простой day summary уже даёт достаточно пользы без сложных графиков.
-- Лёгкий coach hint может усилить ясность, но не является обязательным driver ценности.
+- Лёгкая deterministic daily tip может усилить ясность, но не является обязательным driver ценности.
 
 ## 15. Риски
 

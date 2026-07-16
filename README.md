@@ -15,7 +15,7 @@ AI Calorie Tracker is a Flutter nutrition-tracking app focused on fast meal logg
 - Photo-based meal logging from camera or gallery.
 - Clarification flow for ambiguous dishes before final analysis.
 - Portion confirmation flow when the backend needs user input or an AI-estimate confirmation.
-- Home dashboard with calorie progress, macro progress, coach-style guidance, and latest meal summary.
+- Home dashboard with calorie progress, macro progress, a deterministic daily tip, and latest meal summary.
 - Manual meal add/edit flow with realtime nutrition recalculation.
 - Session-based history grouped into breakfast, lunch, dinner, and snacks.
 - Local persistence for onboarding and meal data with `SharedPreferences`.
@@ -85,7 +85,7 @@ The manual meal form supports linked calories/macros behavior, session-scoped fi
       <br />
       <strong>Daily progress dashboard</strong>
       <br />
-      The home screen surfaces calories, macros, and coach-style guidance at a glance.
+      The home screen surfaces calories, macros, and a deterministic daily tip at a glance.
     </td>
     <td align="center" width="33%">
       <img src="docs/images/readme/add-meal-actions.jpg" alt="Add meal action sheet" width="240" />
@@ -167,7 +167,7 @@ lib/
   onboarding.dart      onboarding UI and nutrition-plan calculation
   meal_session.dart    session grouping, thresholds, tiering, overrides
   meal_type.dart       meal classification by time window
-  home_coach.dart      coach-card heuristics and messaging
+  home_coach.dart      deterministic daily-tip heuristics and messaging
   photo_food/          API client, models, controller, repository abstractions
   profile/             profile and account/settings screens
 docs/
