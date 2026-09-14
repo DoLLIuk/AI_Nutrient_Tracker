@@ -13,9 +13,10 @@ Use this map before changing product scope, architecture, AI behavior, or launch
 - [BETA_V1_CHECKLIST.md](BETA_V1_CHECKLIST.md): approved release gates, beta success definition, tester script, and go/no-go rules.
 - [ANALYTICS.md](ANALYTICS.md): Beta event contract, privacy boundary, and provider integration rules.
 - [FUTURE_PRODUCT_GOALS.md](FUTURE_PRODUCT_GOALS.md): post-v1 roadmap, launch, monetization, integrations, and sponsor timing.
+- [planning/PRODUCT_AND_LAUNCH_PLAN.ru.md](../planning/PRODUCT_AND_LAUNCH_PLAN.ru.md): canonical Russian discovery, concierge-testing, beta-recruitment, and launch plan; English mirror is beside it.
 - [AI_NUTRITION_COACH.md](AI_NUTRITION_COACH.md): future personalized AI nutrition coach spec. Not MVP scope.
 - [PROJECT_WORK_BACKLOG.md](PROJECT_WORK_BACKLOG.md): practical gaps to close before larger feature implementation.
-- [MEAL_EDIT_AUTO_CALC.md](MEAL_EDIT_AUTO_CALC.md): detailed manual meal editing rules.
+- [MEAL_EDIT_AUTO_CALC.md](MEAL_EDIT_AUTO_CALC.md): manual meal rules and the production-ready, feature-frozen Add Meal contract.
 
 ## How To Read
 
@@ -27,7 +28,7 @@ For implementation work:
 4. If the work changes product scope, check [MVP_PRD.md](MVP_PRD.md).
 5. If the work affects beta readiness or distribution, check [BETA_V1_CHECKLIST.md](BETA_V1_CHECKLIST.md).
 6. If the work touches beta telemetry, check [ANALYTICS.md](ANALYTICS.md).
-7. If the work is future-facing, check [FUTURE_PRODUCT_GOALS.md](FUTURE_PRODUCT_GOALS.md).
+7. If the work is future-facing, check [FUTURE_PRODUCT_GOALS.md](FUTURE_PRODUCT_GOALS.md); for user discovery, tester recruitment, or launch positioning, start with [planning/PRODUCT_AND_LAUNCH_PLAN.ru.md](../planning/PRODUCT_AND_LAUNCH_PLAN.ru.md).
 8. If the work touches AI coach behavior, check [AI_NUTRITION_COACH.md](AI_NUTRITION_COACH.md).
 9. If the work is about project readiness or cleanup, check [PROJECT_WORK_BACKLOG.md](PROJECT_WORK_BACKLOG.md).
 10. If the work touches manual meal editing, check [MEAL_EDIT_AUTO_CALC.md](MEAL_EDIT_AUTO_CALC.md).

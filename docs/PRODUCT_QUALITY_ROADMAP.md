@@ -138,6 +138,8 @@
 - `[x]` Минимальная Firebase Analytics интеграция и event contract добавлены.
 - `[x]` Android Firebase DebugView был подтверждён на физическом устройстве.
 - `[x]` Manual form получила fixed submit action и валидацию имени; widget tests покрывают компактный экран.
+- `[x]` Manual Add Meal production-ready для closed beta и feature-frozen, кроме bug fixes; расчёт калорий и безопасное ручное переопределение покрыты widget tests.
+- `[x]` Delayed manual logging и безопасные category moves реализованы; optional meal-time picker сознательно отложен.
 - `[x]` Притворяющиеся account/premium/security поверхности были убраны или сделаны честнее.
 - `[~]` Android physical-device walkthrough проведён; iOS physical-device walkthrough ещё не подтверждён.
 
@@ -393,15 +395,15 @@
 - Live simultaneous multi-device sync и automatic conflict merge.
 - Реклама, social features и broad fitness tracking.
 
-Эти направления не отменены. Первым Premium-направлением после v1 станет proactive AI Coach с персонализацией, добровольным расписанием и opt-in push. Он требует отдельного scope, privacy/safety review, recipe/food base, измеримой причины и нового quality gate после Public v1.
+Эти направления не отменены. Proactive AI Coach — кандидат на первое Premium-направление после v1, но не зафиксирован как обязательный. Он требует отдельного discovery/concierge evidence, scope, privacy/safety review, recipe/food base, измеримой причины и нового quality gate после Public v1.
 
-## 15. Первый Premium-этап после Public v1: Personal AI Coach
+## 15. Кандидат на Premium-этап после Public v1: Personal AI Coach
 
 ### Цель
 
 Добавить платную персонализацию только поверх уже проверенного дневника, а не подменять ею базовую ценность продукта.
 
-Подробная спецификация и locked product decisions: [AI_NUTRITION_COACH.md](AI_NUTRITION_COACH.md).
+Подробная candidate-спецификация и условия валидации: [AI_NUTRITION_COACH.md](AI_NUTRITION_COACH.md).
 
 ### Premium capability
 
@@ -416,5 +418,5 @@
 ### Границы и exit gate
 
 - Free manual logging, базовые цели и история не ухудшаются из-за Premium coach.
-- Coach не стартует до подтверждения спроса, consent/privacy review, recipe/food-base readiness и измеримого retention hypothesis.
+- Coach не стартует до подтверждения спроса в discovery/concierge-исследовании, consent/privacy review, recipe/food-base readiness и измеримой retention hypothesis.
 - До расширения на health data подтверждаются: полезность coach cards, низкая доля жалоб/отключений и отсутствие safety incidents.

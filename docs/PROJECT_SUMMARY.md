@@ -1,6 +1,6 @@
 # AI Calorie Tracker — Project Summary
 
-Статус на 2026-07-11: Flutter-приложение с работающим core food-logging loop находится на этапе internal alpha перед закрытой Beta v1. Документ предназначен для быстрого handoff: его должно быть достаточно, чтобы понять продукт, текущую реализацию, принятые решения и следующий приоритет без чтения всей истории проекта.
+Статус на 2026-07-16: Flutter-приложение с работающим core food-logging loop находится на этапе internal alpha перед закрытой Beta v1. Документ предназначен для быстрого handoff: его должно быть достаточно, чтобы понять продукт, текущую реализацию, принятые решения и следующий приоритет без чтения всей истории проекта.
 
 ## 1. Что это за продукт
 
@@ -30,7 +30,7 @@ AI Calorie Tracker — mobile nutrition diary для iOS и Android. Польз�
   - backend-driven portion confirmation;
   - понятный error state;
   - явный `Add manually` fallback, если анализ не удался.
-- Manual form поддерживает название, калории, вес, белки/жиры/углеводы и тип приёма пищи.
+- Manual Add Meal поддерживает название, вес, белки/жиры/углеводы, вычисляемые или явно вручную введённые калории и тип приёма пищи. Эта поверхность production-ready для closed beta и feature-frozen, кроме bug fixes.
 - Submit action закреплён внизу формы и доступен на компактном экране/с клавиатурой.
 - Пустое или состоящее из пробелов название не сохраняется.
 
@@ -38,7 +38,7 @@ AI Calorie Tracker — mobile nutrition diary для iOS и Android. Польз�
 
 - Home показывает calories consumed/remaining, macros и `Today’s tip`: короткую deterministic-подсказку из текущего дневного прогресса, а не AI Coach.
 - История группируется в meal sessions, а не в плоский список.
-- Сессии отображаются в Breakfast, Lunch, Dinner и Snacks; классификация учитывает время и калорийность.
+- Сессии отображаются в Breakfast, Lunch, Dinner и Snacks; классификация учитывает время и калорийность. Позднее добавленные или перенесённые в другую категорию блюда отображаются в конце выбранной категории без выдуманного времени и не перемещают соседние timed meals.
 - Блюдо можно открыть, изменить или удалить. Manual edit поддерживает связанные пересчёты БЖУ/калорий, field locks, restore/reset и conflict handling.
 - Profile честно показывает данные onboarding и текущий daily plan. Аккаунта, Premium entitlement и cloud sync в текущем приложении **нет**.
 
@@ -68,8 +68,8 @@ AI Calorie Tracker — mobile nutrition diary для iOS и Android. Польз�
 
 ### Подтверждённое состояние
 
-- `flutter analyze` — clean на 2026-07-11.
-- `flutter test` — 70 тестов проходят на 2026-07-11.
+- `flutter analyze` — clean на 2026-07-16.
+- `flutter test` — 78 тестов проходят на 2026-07-16.
 - Android Firebase DebugView был подтверждён на физическом устройстве.
 - Android internal-alpha walkthrough был начат; полный acceptance script ещё должен быть формально закрыт.
 

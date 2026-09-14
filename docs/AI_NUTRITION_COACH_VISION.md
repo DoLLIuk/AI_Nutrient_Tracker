@@ -1,40 +1,5 @@
-# AI Nutrition Coach — Product Vision (v1.5)
+# Archived AI Nutrition Coach Vision
 
-Status: product decisions finalized. This is source material for the canonical [AI_NUTRITION_COACH.md](AI_NUTRITION_COACH.md); shipping remains a Premium stage after Public v1.
+This superseded draft treated the Coach behaviour and product decisions as final. That is no longer accurate: the Coach is a candidate direction whose demand and useful proactive behaviour must first be tested through discovery and a manual concierge test.
 
-## 1. Ядро идеи
-
-Проактивный AI-агент, который адаптируется под расписание и историю питания пользователя, и сам инициирует контакт перед приёмами пищи — а не ждёт, пока пользователь откроет приложение и спросит совета.
-
-Это главный дифференциатор продукта против Cal AI / MyFitnessPal, которые остаются пассивными logging-инструментами. Целевая аудитория первого спроса — люди, уже платящие нутрициологам (fitness community), которым нужен постоянный, доступный 24/7 аналог живого специалиста.
-
-## 2. Конкретный сценарий (reference case)
-
-- Пользователь указывает в onboarding/settings примерное время пробуждения и удобное время приёмов пищи (explicit input, не поведенчески выученное — см. открытый вопрос ниже).
-- Примерно за 20 минут до заданного времени приёма пищи агент присылает push-уведомление.
-- Сообщение опирается на историю питания за предыдущий период (не обязательно один день — см. открытый вопрос) и генерирует конкретную, персонализированную рекомендацию.
-
-Пример тона и формата:
-
-> "Привет! Вчера не хватило белка. Хороший завтрак для продуктивной пятницы — 4 сырника и [...]. Это даст хороший старт дня и заряд энергии до следующего приёма пищи."
-
-Тон: тёплый, мотивирующий, без осуждения. Конкретная рекомендация с числом/порцией, а не общий совет вроде "ешь больше белка".
-
-## 3. Решённые продуктовые вопросы
-
-- **Окно анализа дефицита:** скользящее среднее за 3 предыдущих дня, не единичный день. Снижает риск "упрёка" за случайные колебания одного дня.
-- **Источник рекомендаций блюд:** гибрид — заранее проверенная recipe/food база отвечает за подбор блюда и точность КБЖУ; LLM используется только для формулировки текста сообщения (тон, персонализация фразы), не для генерации самих цифр. Это устраняет риск hallucination в нутриентах.
-- **Источник расписания:** явный ручной ввод в onboarding, с возможностью подправить позже в settings. Learned schedule из поведения — вне scope v1.5.
-- **Надёжность доставки уведомления:** мягкое окно, ±30-40 минут от заявленного времени еды — приемлемо. Не требуется строгая точность "ровно за 20 минут", что снимает жёсткую зависимость от iOS background execution timing.
-- **Холодный старт (первые 3-7 дней):** агент даёт общий совет без привязки к конкретному блюду или рецепту (например "сегодня добавь белок"), пока не накопится достаточно истории для персонализированной рекомендации из recipe-базы.
-- **Медицинские границы:** формулировки остаются в рамках поведенческих nudges ("хороший старт дня", "заряд энергии"), не переходят в medical/diagnostic claims. Требует review с текущим disclaimer-правилом продукта при implementation (не переопределяется этим документом).
-
-## 4. Почему это не входит в Beta v1 as-is
-
-Beta v1 в текущем виде тестирует базовый habit loop (onboarding → log → understand progress → return). Полноценный coach добавляет отдельный, непроверенный слой (расписание, notification infra, safety review генерируемого контента) поверх ещё не подтверждённого core loop — что мешает понять, какая часть результата beta относится к какой гипотезе.
-
-## 5. Not included in Beta v1
-
-The proposed schedule-onboarding question and fake-door demand test are not approved and are not part of Beta v1. They require a separate product decision.
-
-After beta, product and technical scoping may start, but the user-facing Premium Coach ships only after Public v1 in the order defined by [PRODUCT_QUALITY_ROADMAP.md](PRODUCT_QUALITY_ROADMAP.md).
+Use the canonical [AI_NUTRITION_COACH.md](AI_NUTRITION_COACH.md) and the discovery plan in [planning/PRODUCT_AND_LAUNCH_PLAN.ru.md](../planning/PRODUCT_AND_LAUNCH_PLAN.ru.md). Do not use this file for scope, launch copy, or implementation decisions.

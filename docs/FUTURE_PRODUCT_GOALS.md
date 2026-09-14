@@ -26,16 +26,11 @@ Do not expand into a broad health app too early. Workouts, sleep, weather, and w
 
 The exact Beta v1 and Public v1 scope is maintained only in [PRODUCT_QUALITY_ROADMAP.md](PRODUCT_QUALITY_ROADMAP.md). In particular, Public v1 includes account backup/restore, subscriptions, Premium history, and weekly reports; it does not include the full AI coach.
 
-This document starts after Public v1. The first post-v1 Premium direction is a personalized AI nutrition coach with optional user-provided routine and coach reminders. Health integrations, live multi-device sync, and broader fitness data remain later candidates.
+This document starts after Public v1. A personalized AI nutrition coach with an optional user-provided routine and coach reminders is a candidate post-v1 Premium direction, not a committed feature. Its discovery and manual concierge validation are defined in [planning/PRODUCT_AND_LAUNCH_PLAN.en.md](../planning/PRODUCT_AND_LAUNCH_PLAN.en.md). Health integrations, live multi-device sync, and broader fitness data remain later candidates.
 
 ## 4. Future AI Nutrition Coach
 
-The future AI coach should be a personal nutritionist, not a general health assistant.
-
-Product shape:
-
-- `Today`: proactive personalized cards on the day screen.
-- `Ask`: user-initiated questions about nutrition decisions.
+If research validates the direction, the future AI coach should be a personal nutrition companion, not a general health assistant. The first capability must be one proven proactive behaviour; `Today` cards and user-initiated `Ask` are separate later decisions, not an approved bundle.
 
 Core context:
 
@@ -89,7 +84,7 @@ References:
 
 ## 6. Reminders And Scheduling
 
-Push reminders can become a useful retention layer after the core diary works.
+Push reminders can become a useful retention layer only after the core diary works and the manual concierge test demonstrates that a concrete reminder behaviour helps rather than annoys users.
 
 Good reminder types:
 
@@ -150,13 +145,15 @@ Minimum beta analytics:
 - `onboarding_step_viewed`
 - `onboarding_completed`
 - `first_meal_logged`
-- `meal_logged` with `source`
-- `photo_analyze_success`
-- `photo_analyze_fail`
+- `meal_logged` with `source`, `day_offset`, and `creates_new_session`
+- `meal_logged_in_existing_session`
+- `photo_analysis_succeeded`
+- `photo_analysis_failed`
 - `manual_fallback_used`
 - `meal_edited`
-- `day_2_returned`
-- `day_7_returned`
+- `meal_deleted`
+
+Beta D2 return is derived from the provider timestamps of `app_opened` and `meal_logged`; it is not sent as a separate event. Day-7 retention is not a Beta v1 decision metric until its own elapsed-time window and denominator are approved. See [ANALYTICS.md](ANALYTICS.md).
 
 Future monetization analytics:
 
@@ -201,22 +198,9 @@ Future engineering:
 
 ## 10. Launch And Growth
 
-The project should not be silently dropped into the stores.
+Do not silently drop the project into app stores, but also do not optimise for broad discovery while its differentiated offer is unproven. The canonical discovery-to-beta plan is [planning/PRODUCT_AND_LAUNCH_PLAN.en.md](../planning/PRODUCT_AND_LAUNCH_PLAN.en.md): first conduct 8–10 problem interviews, then a small consent-based concierge/usability test, then recruit the approved 20–50-person Beta v1 cohort from a targeted partner audience.
 
-Recommended order:
-
-1. 10-20 manual testers.
-2. 30-100 closed beta users through TestFlight / Google Play testing.
-3. Landing/project page with screenshots and short demo.
-4. Public store release.
-5. Product Hunt or community launch after there is a clean demo and early feedback.
-
-References:
-
-- Apple TestFlight: https://developer.apple.com/testflight/
-- Google Play testing: https://support.google.com/googleplay/android-developer/answer/9845334
-- Product Hunt Launch Guide: https://www.producthunt.com/launch
-- Reddit self-promotion guide: https://www.reddit.com/r/reddit.com/wiki/selfpromotion/
+TestFlight and Google Play closed tracks distribute an already recruited cohort; beta directories, Product Hunt, BetaList, and broad community promotion do not validate organic retention. Defer them until a repeated problem, a credible offer, and early user evidence exist.
 
 ## 11. Sponsor And Partner Timing
 

@@ -1,292 +1,99 @@
-# AI Calorie Tracker Product And Launch Plan
+# AI Calorie Tracker — Discovery, Beta, and Launch Plan
 
-Updated: 2026-07-06
+Updated: 2026-09-08
 
-> Note: [docs/PRODUCT_QUALITY_ROADMAP.md](../docs/PRODUCT_QUALITY_ROADMAP.md) now defines the canonical stage order and quality gates through Public v1. This document remains useful for strategic and public-planning context; the master roadmap wins if they differ.
+> [PRODUCT_QUALITY_ROADMAP.md](../docs/PRODUCT_QUALITY_ROADMAP.md) owns the release-stage order and quality gates. [BETA_V1_CHECKLIST.md](../docs/BETA_V1_CHECKLIST.md) owns the 14-day closed-beta protocol. This document defines how to find evidence of demand and suitable participants before broader beta distribution.
 
-This document outlines a practical path from the current app to `Beta v1`, early users, and a public launch. The goal is not just to publish the app in the stores. The goal is to prepare the product, audience, feedback loop, and project story before launch.
+## Current decision
 
-## 1. Strategy
+AI calorie tracking is a crowded category. Fast photo logging, manual fallback, and a clear daily summary are valuable product foundations, but not yet a compelling reason for a stranger to replace an established tracker for a week. Do not optimise for downloads yet.
 
-Near-term goal: `Beta v1`.
+Validate this hypothesis instead:
 
-`Beta v1` is not the final perfect product. It is a stable version that can be tested by real users to validate the core loop:
+`people who want to track calories but repeatedly fall out of the habit because of friction and routine will return when fast logging is paired with timely, non-judgmental proactive help`.
 
-`complete onboarding -> log a meal -> see daily progress -> understand the next step -> return later`
+This is a research hypothesis, not an existing feature promise.
 
-Priorities:
+## Validation sequence
 
-- prove that the core loop is useful;
-- recruit real early users and collect feedback;
-- measure retention and key flow completion;
-- avoid rushing into sponsorships, paywalls, or a large public campaign before there is evidence of user interest.
+| Stage | Participants | Question |
+| --- | ---: | --- |
+| Problem discovery | 8–10 target users | Which recurring problem is painful enough, for whom? |
+| Usability and concierge test | 5–10 users | Is the current flow understandable, and is proactive help useful when delivered manually? |
+| Closed Beta v1 | 20–50 target testers | Do people return to the real app’s core loop? |
 
-The project should not start with sponsor outreach. Sponsors and partners are easier to convince when there is already a demo, beta users, screenshots, a short video, and early usage signals.
+Never treat paid usability participants or random beta-directory installs as evidence of organic retention.
 
-## 2. Product Roadmap
+## 1. Problem discovery
 
-### Pre-Beta
+Recruit people who used a calorie tracker for at least a week in the last six months, actively use or recently abandoned one, and can describe a real occasion when they stopped logging. Recruit through small coaches, creators, fitness communities, direct outreach, or paid research panels.
 
-Goal: make the product usable by people other than the creator.
+Use this 25-minute interview script before showing the app:
 
-Work to complete:
+1. Tell me about the last time you tried calorie tracking. What was your goal?
+2. How did you log food? What was slow or frustrating?
+3. Tell me about the last meal you did not log. What happened?
+4. Why did you pause or abandon the diary?
+5. What tools have you tried, and what still works well in them?
+6. When would help be most useful: before a meal, after a missed log, in the evening, or elsewhere?
+7. What notification would help you return, and what would feel intrusive?
+8. If you could change one thing about tracking, what would it be?
+9. Then show the demo: what solves a real problem, and what does not?
 
-- stabilize onboarding, home dashboard, photo flow, manual add/edit, and session history;
-- confirm local data survives normal app restarts;
-- make fallback paths clear when AI photo analysis fails;
-- remove or soften UI that looks like real analytics but is currently only demonstrational;
-- prepare a production-style `API_BASE_URL` / `API_KEY` workflow that avoids manual confusion;
-- add basic event analytics;
-- prepare a privacy policy and a clear medical disclaimer.
+Record direct wording, context, workaround, drop-off trigger, desired help, and willingness to test. Do not collect health diagnoses, body measurements, meal photos, or detailed diet data unless specifically necessary and consented to.
 
-Minimum analytics events:
+Advance only when an independently repeated scenario emerges and several people will try a concrete solution for a week.
 
-- `onboarding_completed`
-- `first_meal_logged`
-- `meal_logged_photo`
-- `meal_logged_manual`
-- `photo_analyze_success`
-- `photo_analyze_fail`
-- `manual_fallback_used`
-- `meal_edited`
-- `day_2_returned`
-- `day_7_returned`
+## 2. Concierge test for proactive help
 
-### Beta v1
+Before building automation, test the behaviour manually with five consenting participants for seven days. Send at most one optional, respectful check-in per day; participants can stop messages immediately. Use voluntary updates or screenshots rather than accessing private meal data without explicit consent.
 
-Goal: give the app to 30-100 users and learn whether they come back.
+Examples:
 
-Readiness criteria:
+- “Your diary is still empty today. If you want to return, you do not need to reconstruct the day—logging the last meal is enough.”
+- “You mentioned evenings are hardest. Want to capture dinner by photo right after eating?”
+- “What is getting in the way this week: time, photo accuracy, or something else?”
 
-- a new user can complete onboarding without explanation;
-- the first meal can be logged quickly;
-- photo-analysis errors do not destroy trust because manual fallback is obvious;
-- users understand how many calories and macros they have consumed and how much remains;
-- users have a quick way to send feedback.
+Measure response, perceived usefulness, a subsequent meal log, annoyance/disable requests, and whether users would keep the help enabled. Automate only one behaviour that helped manually; stopping the direction is also a valid result.
 
-Metrics to watch:
+## 3. Usability and closed beta
 
-- onboarding completion rate;
-- first meal logged rate;
-- meals logged per active day;
-- photo flow completion rate;
-- manual fallback rate;
-- day-2 retention;
-- day-7 retention;
-- qualitative feedback: what was unclear, where users dropped, and what felt missing.
+Run 5–10 usability sessions for onboarding, photo/manual logging, uncertainty fallback, daily-progress comprehension, and feedback reporting. [User Interviews](https://www.userinterviews.com/usability-tests) and [Respondent](https://www.respondent.io/) can recruit paid research participants when personal contacts are unavailable.
 
-### Public v1
+After discovery and usability, recruit the approved 20–50-person, 14-day Beta v1 cohort. Its protocol and metrics must stay aligned with [BETA_V1_CHECKLIST.md](../docs/BETA_V1_CHECKLIST.md). The preferred source is a small audience with existing trust—a trainer, nutrition coach, fitness creator, gym, or wellness community.
 
-Goal: launch publicly after the beta version survives real usage.
+Suggested invitation:
 
-The exact scope, including account restore and Premium subscriptions, is defined in the master roadmap and is intentionally not duplicated here.
+> I am looking for 5–10 people who currently try to keep a food diary but sometimes abandon it because of routine. This is a free 14-day test: log at least three meals across two sessions and tell me honestly what gets in the way. It is not medical advice and not a subscription sale.
 
-Before launch:
+TestFlight and Google Play Closed Testing distribute builds; they do not recruit motivated users. [TestFlight external testing](https://developer.apple.com/help/app-store-connect/test-a-beta-version/invite-external-testers) and [Google Play Closed Testing](https://play.google.com/console/about/closed-testing/) are the distribution infrastructure.
 
-- prepare store screenshots and a short demo video;
-- create a landing/project page;
-- define the product in one sentence;
-- prepare FAQ content about AI accuracy, privacy, medical disclaimer, and manual input;
-- verify crash/error monitoring;
-- prepare App Store / Google Play metadata;
-- prepare launch posts for different channels.
+## Channel decisions
 
-Product sentence:
+| Channel | Role now | Decision |
+| --- | --- | --- |
+| Coaches, micro-creators, small fitness communities | Targeted cohorts | First priority |
+| Paid research panels | Interviews and usability | Use in a limited, explicit research budget |
+| Simple landing page / waitlist | Test messaging and collect interest | Build before broad launch |
+| TestFlight / Google Play closed tracks | Build distribution | Required beta infrastructure |
+| Tester directories | Compatibility or isolated feedback | Never use for retention conclusions |
+| itch.io | Technically supports software but is game-focused | Not an acquisition channel |
+| BetaList / Product Hunt | Broad discovery after a proven offer | Postpone |
+| Large weight-loss subreddits | Rules commonly prohibit promotion | Do not recruit directly without moderator permission |
 
-`AI Calorie Tracker helps you log meals faster with photo analysis, manual fallback, and a clear daily calorie and macro summary.`
+BetaList requires a proprietary-domain website, paid submission, and editorial acceptance; [its terms](https://betalist.com/terms/submissions) make it a later launch option, not validation. itch.io describes itself as an independent-game-focused marketplace despite supporting software. [About itch.io](https://itch.io/docs/general/about).
 
-### Post-v1
+## Next 30 days
 
-Goal: expand only after the core loop shows real engagement.
+| Week | Action | Output |
+| --- | --- | --- |
+| 1 | Recruit and conduct 4–5 interviews | Problem map and direct quotes |
+| 2 | Complete 4–5 more; choose one segment and scenario | Cohort offer and landing-page copy |
+| 3 | Run a 7-day concierge test with five people plus 3–5 usability sessions | Evidence for or against proactive help |
+| 4 | Fix the largest UX issues and make one next-step decision | Decision memo: automate one behaviour, test photo speed, or return to discovery |
 
-Possible directions:
+## Related documents
 
-- personalized AI nutrition coach;
-- integrations with Apple Health, Android Health Connect, Fitbit/Google Health, or other activity sources;
-- push reminders;
-- live multi-device sync;
-- stronger local database.
-
-Important: monetization and AI coaching should not be used to rescue a weak core loop. They should strengthen a food diary that is already useful.
-
-## 3. Launch Roadmap
-
-### Step 1: Manual testers
-
-Goal: 10-20 people.
-
-Where to find them:
-
-- friends and acquaintances who track calories or go to the gym;
-- school or local chats;
-- fitness communities;
-- people who have tried MyFitnessPal, Yazio, Lifesum, Cronometer, or similar apps.
-
-What to give testers:
-
-- a short explanation: "This is an app for fast meal logging by photo or manual input";
-- a build link;
-- a request to log at least 2-3 meals in one day;
-- 3 follow-up questions:
-  - what was unclear?
-  - what felt faster or easier than a normal tracker?
-  - would you return tomorrow?
-
-### Step 2: Closed beta
-
-Goal: 30-100 users.
-
-Channels:
-
-- Apple TestFlight: https://developer.apple.com/testflight/
-- Google Play testing tracks: https://support.google.com/googleplay/android-developer/answer/9845334
-
-Focus:
-
-- stability;
-- onboarding;
-- first meal logging;
-- AI photo flow;
-- manual fallback;
-- Home screen feedback.
-
-Do not add too many new features at this stage. Improving the main path is more valuable than widening the product.
-
-### Step 3: Landing/project page
-
-Goal: give the project a clear public home.
-
-The page should include:
-
-- product name;
-- short promise;
-- 4-6 screenshots;
-- 20-40 second demo video or GIF;
-- core feature list;
-- beta / waitlist / feedback form link;
-- privacy/disclaimer links;
-- GitHub link if it helps trust.
-
-This should not be a heavy marketing landing page. For this project, a clear product page is better: what the app does, who it is for, and what already works.
-
-### Step 4: Public launch
-
-Goal: create several waves of attention instead of silently uploading the app to the stores.
-
-Waves:
-
-- launch day: GitHub README update, landing page, short video;
-- first week: personal social posts, fitness/weight-loss communities, indie maker communities;
-- after first feedback: Product Hunt or a similar launch platform;
-- after improvements: "what changed after beta feedback" content.
-
-Product Hunt reference: https://www.producthunt.com/launch
-
-Use Reddit carefully. Do not join communities only to drop links. Participate first, answer questions, be honest, and clearly disclose that it is your own project. Reference: https://www.reddit.com/r/reddit.com/wiki/selfpromotion/
-
-## 4. Attention Strategy
-
-Main angle:
-
-`A simple AI calorie tracker focused on fast meal logging, clear daily progress, and manual fallback when AI is uncertain.`
-
-Content to prepare:
-
-- short demo video: onboarding -> photo meal -> confirmation -> day summary;
-- before/after: manual meal logging vs photo logging;
-- thread/post: "What I learned building an AI calorie tracker";
-- UX post: why AI should clarify and ask for confirmation when uncertain;
-- screenshots for README and store pages;
-- small changelog after each beta iteration.
-
-Channels:
-
-- GitHub;
-- X / Threads / LinkedIn if there is an audience there;
-- Reddit, with respect for community rules;
-- Product Hunt when the demo is ready;
-- local fitness / gym / weight-loss groups;
-- personal network and school chats.
-
-## 5. Sponsors And Partners
-
-Do not pursue sponsors before beta. Early users matter more.
-
-Good timing:
-
-- 50-100 beta users;
-- a clear demo video;
-- 3-5 strong testimonials;
-- evidence that people log more than one meal;
-- early retention numbers.
-
-Who to contact:
-
-- local fitness trainers;
-- small gyms;
-- nutrition coaches;
-- student wellness communities;
-- creators who talk about nutrition and fitness.
-
-What to offer:
-
-- not "fund an idea";
-- instead: "here is a working beta product, your audience can get early access";
-- a shared feedback cohort;
-- a public case study;
-- partner promo code later if premium exists.
-
-## 6. Summer Work Plan
-
-### Week 1
-
-- run the full core flow on a real device;
-- record a demo video;
-- write down bugs and UX friction;
-- choose 10 manual testers.
-
-### Week 2
-
-- fix the top 5 issues from self-testing;
-- prepare a feedback form;
-- give the build to first testers;
-- record user phrases, not just bugs.
-
-### Week 3
-
-- improve onboarding and first meal flow based on feedback;
-- add or verify basic analytics;
-- prepare screenshots and a short product description.
-
-### Week 4
-
-- start closed beta;
-- recruit 30+ users;
-- watch first meal logged rate and day-2 retention;
-- avoid major new features until the main path is reliable.
-
-### After Month 1
-
-- decide whether to continue beta, prepare public v1, or return to core UX;
-- if the core loop works, prepare the landing page and public launch;
-- if retention is weak, investigate logging speed, AI trust, and Home screen clarity.
-
-## 7. Decisions To Delay
-
-Do not decide too early:
-
-- exact subscription price;
-- complex paywall strategy;
-- full AI coach;
-- live multi-device sync;
-- multiple health platform integrations at once;
-- partnerships before beta.
-
-These decisions will be better after real users.
-
-## 8. References
-
-- Apple TestFlight: https://developer.apple.com/testflight/
-- Google Play testing: https://support.google.com/googleplay/android-developer/answer/9845334
-- Product Hunt Launch Guide: https://www.producthunt.com/launch
-- Reddit self-promotion guide: https://www.reddit.com/r/reddit.com/wiki/selfpromotion/
+- [BETA_V1_CHECKLIST.md](../docs/BETA_V1_CHECKLIST.md) — beta gates and metrics.
+- [ANALYTICS.md](../docs/ANALYTICS.md) — current analytics event contract.
+- [AI_NUTRITION_COACH.md](../docs/AI_NUTRITION_COACH.md) — future Coach hypothesis and safety boundary.

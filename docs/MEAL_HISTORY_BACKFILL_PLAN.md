@@ -1,6 +1,6 @@
 # Meal History: Delayed Logging And Category Moves
 
-Status: implementation in progress; optional meal-time picker deferred.
+Status: implementation complete; optional meal-time picker deferred.
 
 Last updated: 2026-07-16
 
@@ -85,11 +85,17 @@ This is intentionally deferred from the first category-only implementation.
 - Changing the date moves the meal's day totals and history entry together; changing only time keeps the selected diary day.
 - Validate local midnight, timezone changes, and daylight-saving transitions.
 
-## Acceptance Tests Before Implementation Is Marked Complete
+## Completion Evidence And Remaining Validation
 
-- Unit tests cover the timed/category-only split, deterministic order, migration of existing meals, and no cross-session category override.
-- Widget tests cover manual backfill, editing an existing saved meal into another category, cancellation, restoring a timed category, latest-card copy, and persistence after restart.
-- Manual smoke tests cover Android and iOS, a past diary day, midnight, and a meal edited near another timed meal.
+Implemented and covered by automated tests:
+
+- [x] Timed/category-only splitting, deterministic category placement, persistence, and legacy-record migration.
+- [x] Manual backfill into a different category without a visible eating time.
+- [x] Moving one saved meal without moving neighbouring timed meals.
+
+Still required before external beta invitations (tracked by the beta release checklist rather than as unfinished feature work):
+
+- [ ] Manual Android and iOS smoke tests, including a past diary day, midnight, and a meal edited beside another timed meal.
 
 ## Scope Boundary
 

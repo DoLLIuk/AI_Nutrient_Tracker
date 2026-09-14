@@ -1,10 +1,10 @@
 # Proactive AI Nutrition Coach
 
-Status: decided Premium product vision. Shipping is a separate stage after Public v1; it is not Beta v1 or Public v1 scope.
+Status: candidate Premium product direction. Its demand and most useful behaviour must be validated through discovery and a manual concierge test before implementation is approved. Shipping, if approved, is a separate stage after Public v1; it is not Beta v1 or Public v1 scope.
 
 Last updated: 2026-07-11
 
-> [PRODUCT_QUALITY_ROADMAP.md](PRODUCT_QUALITY_ROADMAP.md) defines the release order. This document is the canonical product specification for the first post-Public-v1 Premium Coach stage.
+> [PRODUCT_QUALITY_ROADMAP.md](PRODUCT_QUALITY_ROADMAP.md) defines the release order. This document is the canonical candidate specification and validation boundary for a possible post-Public-v1 Premium Coach stage.
 
 ## 1. Product role
 
@@ -24,7 +24,9 @@ Reference tone and format:
 
 The message is warm, motivating, concrete, and never shaming. It recommends a specific meal/portion rather than a vague instruction such as "eat more protein".
 
-## 3. Locked product decisions
+## 3. Candidate product decisions
+
+The items in this section are design constraints for the research prototype and later technical scoping, not proof that users want this Coach. The validation sequence, interview guide, and concierge-test protocol live in [planning/PRODUCT_AND_LAUNCH_PLAN.ru.md](../planning/PRODUCT_AND_LAUNCH_PLAN.ru.md).
 
 ### Deficit analysis
 
@@ -68,8 +70,9 @@ The provider, licensing, API, data model, data-quality process, and update owner
 ## 5. Scope and sequence
 
 - Beta v1 validates the existing loop: `onboarding → log meals → understand progress → return`.
+- Research interviews and a consent-based manual concierge test may happen before Beta v1. They do not add a user-facing Coach capability or alter the Beta v1 event contract.
 - Beta v1 does not add a schedule onboarding question, fake-door demand test, Coach notification, recipe-base integration, or Coach logic.
-- After beta, product and technical scoping may begin, but user-facing Coach shipping remains a separate Premium stage after Public v1.
+- After beta, product and technical scoping may begin only if research shows a repeated, useful scenario; user-facing Coach shipping remains a separate Premium stage after Public v1.
 - Public v1 still excludes the Coach, user meal schedule, proactive notifications, and the push-notification system.
 
 Reactive chat (`Today + Ask`) is not an approved Coach capability in this vision. It requires a separate product decision and does not follow automatically from proactive notifications.
@@ -80,4 +83,5 @@ Reactive chat (`Today + Ask`) is not an approved Coach capability in this vision
 - Every notification has a respectful tone, an opt-out path, and no hidden use of health data.
 - The user can edit schedule, quiet hours, and notification preferences without losing access to manual logging or the diary.
 - Before shipping, validate consent, delivery reliability, recipe-base quality, generated-copy safety, dismiss/disable behaviour, and any recurring safety incidents.
+- Before implementation, retain evidence that a specific proactive behaviour helped in the manual concierge test and that participants would choose to keep it enabled. Do not build a broad Coach solely because users say that "AI" sounds useful.
 - Evaluate usefulness through notification open/dismiss/disable behaviour, meal logging, eligible D2 return, nutrition-target completion, and qualitative feedback—not message volume alone.

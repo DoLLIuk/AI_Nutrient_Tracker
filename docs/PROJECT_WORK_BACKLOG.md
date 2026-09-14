@@ -25,9 +25,10 @@ It is intentionally practical. It is not a product pitch and not a detailed engi
 - Make the first meal log fast enough to feel valuable.
 - Make photo failure states clear and non-frustrating.
 - Make manual fallback obvious and usable.
+- [x] Finalize Manual Add Meal for closed beta: production-ready interaction, feature-frozen except for bug fixes. Rules: `MEAL_EDIT_AUTO_CALC.md`.
 - Make Home screen answer the basic question: "How is my day going?"
 - Make edit/delete behavior feel safe and predictable.
-- [ ] Implement delayed manual logging and safe category moves according to [MEAL_HISTORY_BACKFILL_PLAN.md](MEAL_HISTORY_BACKFILL_PLAN.md), without letting a manual category override move nearby timed meals.
+- [x] Implement delayed manual logging and safe category moves according to [MEAL_HISTORY_BACKFILL_PLAN.md](MEAL_HISTORY_BACKFILL_PLAN.md), without letting a manual category override move nearby timed meals. The optional meal-time picker remains deferred.
 - Make empty states useful instead of looking unfinished.
 
 ## 3. Data And Persistence

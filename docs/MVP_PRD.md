@@ -164,7 +164,7 @@ AI Food Logger — это приложение, которое делает ло
 Следующие вещи не считаются обязательными для первой рабочей версии:
 
 - полноценный AI coach как основная продуктовая роль;
-- AI-нутрициолог `Today + Ask`;
+- proactive AI Coach, включая `Today + Ask` или другую форму, до отдельной валидации спроса;
 - LLM-зависимость core loop;
 - сложные insights и аналитика по неделям/месяцам;
 - streak mechanics;
@@ -321,7 +321,7 @@ AI Food Logger — это приложение, которое делает ло
 - streak mechanics;
 - deeper insights;
 - coach system как отдельный retention layer;
-- персональный AI-нутрициолог `Today + Ask`;
+- proactive AI Coach как отдельный retention layer только после отдельной валидации спроса;
 - integrations с Apple Health, Android Health Connect, Fitbit/Google Health;
 - activity calories как context для nutrition advice;
 - облачная синхронизация / аккаунты;
@@ -342,7 +342,7 @@ AI Food Logger — это приложение, которое делает ло
 `Не строить сразу "AI diet coach". Сначала доказать ценность узкого продукта для ежедневного логирования еды.`
 
 Если core loop показывает хорошее удержание, тогда продукт можно расширять в сторону:
-- AI-нутрициолога `Today + Ask`;
+- один подтверждённый сценарий proactive AI Coach;
 - push;
 - subscriptions;
 - integrations как источников nutrition context;
