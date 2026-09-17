@@ -3110,7 +3110,10 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
   }) {
     final isOverTarget = over > 0;
     final statusValue = isOverTarget ? over : remaining;
-    final statusColor = isOverTarget ? const Color(0xFFFFB5AE) : Colors.white;
+    // Keep the metric itself white for reliable contrast on the gradient.
+    // The overage state gets its own high-chroma badge and progress segment
+    // instead of tinting three lines of text a low-contrast warm color.
+    const statusColor = Colors.white;
     return Container(
       key: const Key('calorie-status-card'),
       width: double.infinity,
@@ -3121,7 +3124,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: isOverTarget
-              ? const [Color(0xFF3B77FF), Color(0xFFA637E9)]
+              ? const [Color(0xFF3B77FF), Color(0xFF7036DE)]
               : const [Color(0xFF3B77FF), Color(0xFF8D2EF4)],
         ),
       ),
@@ -3144,6 +3147,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                 subtitle: isOverTarget ? 'kcal over goal' : 'kcal',
                 alignEnd: true,
                 color: statusColor,
+                isOverTarget: isOverTarget,
               ),
             ],
           ),
@@ -3958,6 +3962,7 @@ class _CalorieStatusValue extends StatelessWidget {
   final String subtitle;
   final bool alignEnd;
   final Color color;
+  final bool isOverTarget;
 
   const _CalorieStatusValue({
     required this.label,
@@ -3965,6 +3970,7 @@ class _CalorieStatusValue extends StatelessWidget {
     required this.subtitle,
     required this.alignEnd,
     required this.color,
+    this.isOverTarget = false,
   });
 
   @override
@@ -3976,16 +3982,45 @@ class _CalorieStatusValue extends StatelessWidget {
       child: Column(
         crossAxisAlignment: alignment,
         children: [
-          Text(
-            label,
-            key: alignEnd ? const Key('calorie-status-label') : null,
-            style: TextStyle(
-              color: color.withValues(alpha: alignEnd ? 1 : 0.9),
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
+          if (isOverTarget)
+            Container(
+              key: const Key('calorie-over-badge'),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFF73A61), Color(0xFFDB2451)],
+                ),
+                borderRadius: BorderRadius.circular(99),
+                border: Border.all(color: const Color(0x66FFFFFF)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x330A1025),
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Text(
+                label,
+                key: const Key('calorie-status-label'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            )
+          else
+            Text(
+              label,
+              key: alignEnd ? const Key('calorie-status-label') : null,
+              style: TextStyle(
+                color: color.withValues(alpha: alignEnd ? 1 : 0.9),
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          const SizedBox(height: 18),
+          SizedBox(height: isOverTarget ? 7 : 18),
           Text(
             value,
             key: alignEnd ? const Key('calorie-status-value') : null,
@@ -4071,7 +4106,7 @@ class _CalorieProgressBar extends StatelessWidget {
                       width: constraints.maxWidth * overflowPosition,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFF665D),
+                          color: const Color(0xFFF73A61),
                           borderRadius: BorderRadius.circular(99),
                         ),
                       ),
