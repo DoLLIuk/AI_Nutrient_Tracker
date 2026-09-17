@@ -45,6 +45,7 @@ class PhotoFoodController extends ChangeNotifier {
 
   HomeState _state = const HomeState.initial();
   XFile? _lastPickedFile;
+  PhotoClarificationInput? _lastClarification;
 
   HomeState get state => _state;
 
@@ -70,6 +71,7 @@ class PhotoFoodController extends ChangeNotifier {
   }) async {
     final pickedFile = _lastPickedFile;
     if (pickedFile == null) return;
+    _lastClarification = clarification;
     _setState(_state.copyWith(status: HomeStatus.uploading));
     try {
       final response = await repository.analyzePhoto(
@@ -99,6 +101,10 @@ class PhotoFoodController extends ChangeNotifier {
         ),
       );
     }
+  }
+
+  Future<void> retryLastAnalysis() {
+    return analyzePickedImage(clarification: _lastClarification);
   }
 
   HomeStatus _resolvedStatus(PhotoFoodResponse response) {

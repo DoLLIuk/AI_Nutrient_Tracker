@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -556,7 +557,6 @@ class _CaloriesHomePage extends StatefulWidget {
 
 class _CaloriesHomePageState extends State<_CaloriesHomePage> {
   int selectedDay = 5;
-  String? _lastErrorKey;
   final MealSessionService _mealSessionService = const MealSessionService();
   final HomeCoachEvaluator _coachEvaluator = const HomeCoachEvaluator();
   final List<_MealEntry> meals = [];
@@ -744,33 +744,6 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
             state.status == HomeStatus.loaded)) {
       _upsertMealFromResponse(state.response!);
     }
-
-    final error = state.error;
-    if (error == null || !mounted) return;
-
-    final key = '${error.code}:${error.requestId ?? ''}';
-    if (_lastErrorKey == key) return;
-    _lastErrorKey = key;
-
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(mapErrorCodeToMessage(error.code)),
-          action: SnackBarAction(
-            label: 'Add manually',
-            onPressed: () async {
-              widget.analytics.track(
-                AnalyticsEvent(
-                  AnalyticsEvents.manualFallbackUsed,
-                  properties: {'error_code': error.code},
-                ),
-              );
-              await _showManualMealSheet();
-            },
-          ),
-        ),
-      );
   }
 
   void _upsertMealFromResponse(PhotoFoodResponse response) {
@@ -2915,6 +2888,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
         final calorieTarget =
             widget.onboardingResult?.plan.calorieTarget.toDouble() ?? 2000.0;
         final remaining = max(0.0, calorieTarget - consumed);
+        final over = max(0.0, consumed - calorieTarget);
         final progress = consumed <= 0
             ? 0.0
             : (consumed / calorieTarget).clamp(0.0, 1.0);
@@ -2958,9 +2932,15 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                     const SizedBox(height: 18),
                     _buildDaysRow(),
                     const SizedBox(height: 18),
+                    if (state.error != null) ...[
+                      _buildPhotoErrorCard(state.error!),
+                      const SizedBox(height: 14),
+                    ],
                     _buildCaloriesCard(
                       consumed: consumed,
+                      target: calorieTarget,
                       remaining: remaining,
+                      over: over,
                       progress: progress,
                     ),
                     const SizedBox(height: 14),
@@ -3123,9 +3103,18 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
 
   Widget _buildCaloriesCard({
     required double consumed,
+    required double target,
     required double remaining,
+    required double over,
     required double progress,
   }) {
+    final isOverTarget = over > 0;
+    final statusText = isOverTarget
+        ? '${over.toStringAsFixed(0)} kcal over'
+        : '${remaining.toStringAsFixed(0)} kcal remaining';
+    final relativeStatus = isOverTarget
+        ? '+${((over / target) * 100).toStringAsFixed(0)}% above your daily target'
+        : '${(progress * 100).toStringAsFixed(0)}% of your daily target';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
@@ -3139,38 +3128,199 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       ),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _NumberBlock(
-                label: 'Consumed',
-                main: consumed.toStringAsFixed(0),
-                sub: 'kcal',
-                alignEnd: false,
-                light: true,
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'TODAY\'S ENERGY',
+              style: TextStyle(
+                color: Color(0xDFFFFFFF),
+                fontSize: 12,
+                letterSpacing: 1.4,
+                fontWeight: FontWeight.w800,
               ),
-              _NumberBlock(
-                label: 'Remaining',
-                main: remaining.toStringAsFixed(0),
-                sub: 'kcal',
-                alignEnd: true,
-                light: true,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                consumed.toStringAsFixed(0),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 48,
+                  height: 0.95,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(left: 8, bottom: 4),
+                child: Text(
+                  'kcal',
+                  style: TextStyle(
+                    color: Color(0xDFFFFFFF),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isOverTarget
+                          ? const Color(0xFFFF665D)
+                          : const Color(0x2AFFFFFF),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      statusText,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
+          const SizedBox(height: 5),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'of ${target.toStringAsFixed(0)} kcal · $relativeStatus',
+              style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 13),
+            ),
+          ),
           const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(40),
-            child: SizedBox(
-              height: 8,
-              child: LinearProgressIndicator(
-                value: progress,
-                backgroundColor: const Color(0x80FFFFFF),
-                valueColor: const AlwaysStoppedAnimation<Color>(
-                  Color(0xFF0E0F16),
+          _CalorieProgressBar(progress: progress, over: over, target: target),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoErrorCard(ApiError error) {
+    final diagnosticId = error.diagnosticId;
+    return Container(
+      key: const Key('photo-analysis-error-card'),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 10, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7F5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFFEC9C3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 2),
+                child: Icon(
+                  Icons.error_outline_rounded,
+                  color: Color(0xFFDC3A31),
+                  size: 22,
                 ),
               ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'We couldn\'t analyze this photo',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+              ),
+              IconButton(
+                key: const Key('photo-error-close'),
+                tooltip: 'Dismiss',
+                onPressed: widget.controller.clearError,
+                icon: const Icon(Icons.close_rounded, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 32, right: 6),
+            child: Text(
+              mapErrorCodeToMessage(error.code),
+              style: const TextStyle(
+                color: Color(0xFF6B3A36),
+                fontSize: 13,
+                height: 1.3,
+              ),
+            ),
+          ),
+          if (diagnosticId != null) ...[
+            const SizedBox(height: 7),
+            Padding(
+              padding: const EdgeInsets.only(left: 32),
+              child: InkWell(
+                key: const Key('copy-photo-diagnostic-id'),
+                onTap: () =>
+                    Clipboard.setData(ClipboardData(text: diagnosticId)),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.copy_outlined, size: 13),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Copy diagnostic ID',
+                        style: TextStyle(
+                          color: Colors.blue.shade800,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.only(left: 32),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  key: const Key('photo-error-retry'),
+                  onPressed: () async {
+                    await widget.controller.retryLastAnalysis();
+                  },
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Try again'),
+                ),
+                OutlinedButton(
+                  key: const Key('photo-error-add-manually'),
+                  onPressed: () async {
+                    widget.analytics.track(
+                      AnalyticsEvent(
+                        AnalyticsEvents.manualFallbackUsed,
+                        properties: {'error_code': error.code},
+                      ),
+                    );
+                    widget.controller.clearError();
+                    await _showManualMealSheet();
+                  },
+                  child: const Text('Add manually'),
+                ),
+              ],
             ),
           ),
         ],
@@ -3755,59 +3905,6 @@ class _CalculatedFieldBadge extends StatelessWidget {
   }
 }
 
-class _NumberBlock extends StatelessWidget {
-  final String label;
-  final String main;
-  final String sub;
-  final bool alignEnd;
-  final bool light;
-
-  const _NumberBlock({
-    required this.label,
-    required this.main,
-    required this.sub,
-    required this.alignEnd,
-    required this.light,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = light ? Colors.white : const Color(0xFF111322);
-    return Column(
-      crossAxisAlignment: alignEnd
-          ? CrossAxisAlignment.end
-          : CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: color.withValues(alpha: 0.9),
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          main,
-          style: TextStyle(
-            color: color,
-            fontSize: 42,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        Text(
-          sub,
-          style: TextStyle(
-            color: color.withValues(alpha: 0.95),
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _CoachCard extends StatelessWidget {
   final CoachCardContent content;
 
@@ -3906,6 +4003,99 @@ class _CoachCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CalorieProgressBar extends StatelessWidget {
+  final double progress;
+  final double over;
+  final double target;
+
+  const _CalorieProgressBar({
+    required this.progress,
+    required this.over,
+    required this.target,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isOverTarget = over > 0;
+    final targetPosition = isOverTarget ? 0.82 : 1.0;
+    final filledPosition = isOverTarget
+        ? targetPosition
+        : progress.clamp(0.0, 1.0);
+    final overflowPosition = isOverTarget
+        ? min(0.18, (over / target) * 0.18)
+        : 0.0;
+
+    return Column(
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            return SizedBox(
+              height: 10,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: const Color(0x42FFFFFF),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: constraints.maxWidth * filledPosition,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF8ED2FF),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                  if (isOverTarget)
+                    Positioned(
+                      left: constraints.maxWidth * targetPosition,
+                      top: 0,
+                      bottom: 0,
+                      width: constraints.maxWidth * overflowPosition,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF665D),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                    ),
+                  if (isOverTarget)
+                    Positioned(
+                      left: (constraints.maxWidth * targetPosition) - 1,
+                      top: -3,
+                      bottom: -3,
+                      child: Container(width: 2, color: Colors.white),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('0', style: TextStyle(color: Color(0xCFFFFFFF))),
+            Text(
+              isOverTarget
+                  ? '${target.toStringAsFixed(0)} goal'
+                  : '${target.toStringAsFixed(0)} kcal goal',
+              style: const TextStyle(color: Color(0xCFFFFFFF)),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app_config.dart';
 import 'api_error.dart';
@@ -20,6 +22,8 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
     'image/webp',
   };
   static const Duration _requestTimeout = Duration(seconds: 25);
+  static const String _pendingDiagnosticsKey =
+      'photo_food.pending_client_diagnostics';
 
   final AppConfig config;
   final http.Client _httpClient;
@@ -35,8 +39,9 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
     PhotoClarificationInput? clarification,
   }) async {
     final uri = _resolveUri('/v0/ai/photo-food');
+    final clientTraceId = _newClientTraceId();
     final request = http.MultipartRequest('POST', uri)
-      ..headers['X-API-Key'] = config.apiKey
+      ..headers.addAll(await _requestHeaders(clientTraceId))
       ..fields['locale'] = locale;
 
     if (mealTime != null && mealTime.trim().isNotEmpty) {
@@ -100,28 +105,36 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
       final body = await streamed.stream.bytesToString().timeout(
         _requestTimeout,
       );
-      return _parseResponseOrThrow(statusCode: streamed.statusCode, body: body);
+      await _clearPendingDiagnostics();
+      return _parseResponseOrThrow(
+        statusCode: streamed.statusCode,
+        body: body,
+        requestId: streamed.headers['x-request-id'],
+        clientTraceId: clientTraceId,
+      );
     } on http.ClientException {
-      throw const ApiException(
-        ApiError(
-          code: 'CONNECTION_ERROR',
-          message: 'Could not connect to the analysis service',
-        ),
+      throw await _transportError(
+        code: 'CONNECTION_ERROR',
+        message: 'Could not connect to the analysis service',
+        clientTraceId: clientTraceId,
       );
     } on SocketException {
-      throw const ApiException(
-        ApiError(code: 'NETWORK_ERROR', message: 'Network error'),
+      throw await _transportError(
+        code: 'NETWORK_ERROR',
+        message: 'Network error',
+        clientTraceId: clientTraceId,
       );
     } on HandshakeException {
-      throw const ApiException(
-        ApiError(
-          code: 'SECURE_CONNECTION_ERROR',
-          message: 'Secure connection to the analysis service failed',
-        ),
+      throw await _transportError(
+        code: 'SECURE_CONNECTION_ERROR',
+        message: 'Secure connection to the analysis service failed',
+        clientTraceId: clientTraceId,
       );
     } on TimeoutException {
-      throw const ApiException(
-        ApiError(code: 'REQUEST_TIMEOUT', message: 'Request timeout'),
+      throw await _transportError(
+        code: 'REQUEST_TIMEOUT',
+        message: 'Request timeout',
+        clientTraceId: clientTraceId,
       );
     }
   }
@@ -133,6 +146,7 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
     bool useAiEstimate = false,
   }) async {
     final uri = _resolveUri('/v0/ai/photo-food/confirm-portion');
+    final clientTraceId = _newClientTraceId();
     final body = <String, dynamic>{
       'request_id': requestId,
       'confirm_mode': useAiEstimate ? 'use_ai_estimate' : 'manual',
@@ -150,40 +164,55 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
           .post(
             uri,
             headers: {
-              'X-API-Key': config.apiKey,
+              ...await _requestHeaders(clientTraceId),
               'Content-Type': 'application/json',
             },
             body: jsonEncode(body),
           )
           .timeout(_requestTimeout);
-
+      await _clearPendingDiagnostics();
       return _parseResponseOrThrow(
         statusCode: response.statusCode,
         body: response.body,
+        requestId: response.headers['x-request-id'],
+        clientTraceId: clientTraceId,
       );
     } on http.ClientException {
-      throw const ApiException(
-        ApiError(
-          code: 'CONNECTION_ERROR',
-          message: 'Could not connect to the analysis service',
-        ),
+      throw await _transportError(
+        code: 'CONNECTION_ERROR',
+        message: 'Could not connect to the analysis service',
+        clientTraceId: clientTraceId,
       );
     } on SocketException {
-      throw const ApiException(
-        ApiError(code: 'NETWORK_ERROR', message: 'Network error'),
+      throw await _transportError(
+        code: 'NETWORK_ERROR',
+        message: 'Network error',
+        clientTraceId: clientTraceId,
       );
     } on HandshakeException {
-      throw const ApiException(
-        ApiError(
-          code: 'SECURE_CONNECTION_ERROR',
-          message: 'Secure connection to the analysis service failed',
-        ),
+      throw await _transportError(
+        code: 'SECURE_CONNECTION_ERROR',
+        message: 'Secure connection to the analysis service failed',
+        clientTraceId: clientTraceId,
       );
     } on TimeoutException {
-      throw const ApiException(
-        ApiError(code: 'REQUEST_TIMEOUT', message: 'Request timeout'),
+      throw await _transportError(
+        code: 'REQUEST_TIMEOUT',
+        message: 'Request timeout',
+        clientTraceId: clientTraceId,
       );
     }
+  }
+
+  Future<ApiException> _transportError({
+    required String code,
+    required String message,
+    required String clientTraceId,
+  }) async {
+    await _enqueueClientDiagnostic(clientTraceId, code);
+    return ApiException(
+      ApiError(code: code, message: message, clientTraceId: clientTraceId),
+    );
   }
 
   Uri _resolveUri(String path) {
@@ -205,6 +234,8 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
   PhotoFoodResponse _parseResponseOrThrow({
     required int statusCode,
     required String body,
+    required String? requestId,
+    required String clientTraceId,
   }) {
     dynamic decoded;
     try {
@@ -214,6 +245,8 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
         ApiError(
           code: 'INVALID_SERVER_RESPONSE',
           message: 'Analysis service returned an invalid response',
+          requestId: requestId,
+          clientTraceId: clientTraceId,
           statusCode: statusCode,
         ),
       );
@@ -225,6 +258,8 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
           ApiError(
             code: 'INVALID_SERVER_RESPONSE',
             message: 'Analysis service returned an invalid response',
+            requestId: requestId,
+            clientTraceId: clientTraceId,
             statusCode: statusCode,
           ),
         );
@@ -236,6 +271,8 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
           ApiError(
             code: 'INVALID_SERVER_RESPONSE',
             message: 'Analysis service returned an invalid response',
+            requestId: requestId,
+            clientTraceId: clientTraceId,
             statusCode: statusCode,
           ),
         );
@@ -244,6 +281,8 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
           ApiError(
             code: 'INVALID_SERVER_RESPONSE',
             message: 'Analysis service returned an invalid response',
+            requestId: requestId,
+            clientTraceId: clientTraceId,
             statusCode: statusCode,
           ),
         );
@@ -252,7 +291,10 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
 
     if (decoded is Map<String, dynamic>) {
       throw ApiException(
-        ApiError.fromEnvelope(decoded, statusCode: statusCode),
+        ApiError.fromEnvelope(
+          decoded,
+          statusCode: statusCode,
+        ).withTrace(requestId: requestId, clientTraceId: clientTraceId),
       );
     }
 
@@ -260,8 +302,66 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
       ApiError(
         code: 'INTERNAL_ERROR',
         message: 'Internal server error',
+        requestId: requestId,
+        clientTraceId: clientTraceId,
         statusCode: statusCode,
       ),
     );
+  }
+
+  String _newClientTraceId() {
+    final timestamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    final random = Random.secure().nextInt(1 << 32).toRadixString(36);
+    return 'cli_$timestamp$random';
+  }
+
+  Future<Map<String, String>> _requestHeaders(String clientTraceId) async {
+    final pending = await _pendingDiagnosticHeader();
+    final diagnosticHeader = pending == null
+        ? const <String, String>{}
+        : <String, String>{'X-Client-Diagnostics': pending};
+    return {
+      'X-API-Key': config.apiKey,
+      'X-Client-Trace-ID': clientTraceId,
+      ...diagnosticHeader,
+    };
+  }
+
+  Future<void> _enqueueClientDiagnostic(
+    String traceId,
+    String errorCode,
+  ) async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final raw = preferences.getStringList(_pendingDiagnosticsKey) ?? const [];
+      final entry = '$traceId:$errorCode';
+      final entries = <String>[
+        entry,
+        ...raw.where((item) => item != entry),
+      ].take(3).toList(growable: false);
+      await preferences.setStringList(_pendingDiagnosticsKey, entries);
+    } catch (_) {
+      // Diagnostics must never prevent the primary photo flow.
+    }
+  }
+
+  Future<String?> _pendingDiagnosticHeader() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final entries =
+          preferences.getStringList(_pendingDiagnosticsKey) ?? const [];
+      return entries.isEmpty ? null : entries.take(3).join(',');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _clearPendingDiagnostics() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.remove(_pendingDiagnosticsKey);
+    } catch (_) {
+      // A duplicated diagnostic is preferable to impacting an analysis result.
+    }
   }
 }

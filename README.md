@@ -140,6 +140,10 @@ This repository is the Flutter client. It owns:
 
 The backend is a separate service and is used here as an API dependency, not embedded in this repository.
 
+For local development, the companion backend lives at
+`C:\\Users\\golov\\rofl_codex\\backend_for_diet_app`. Production runs on GCP
+Cloud Run; its request-level diagnostic events are available in Cloud Logging.
+
 Core frontend flow:
 
 `Onboarding -> nutrition targets -> meal logging -> local persistence -> session rebuild -> daily progress UI`

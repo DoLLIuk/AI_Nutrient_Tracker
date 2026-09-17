@@ -298,6 +298,9 @@ void main() {
     await tester.tap(find.byKey(const Key('clarification-skip')));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('photo-analysis-error-card')), findsOneWidget);
+    expect(find.byKey(const Key('photo-error-retry')), findsOneWidget);
+    expect(find.byKey(const Key('photo-error-close')), findsOneWidget);
     expect(find.text('Add manually'), findsOneWidget);
     expect(
       analytics.events.map((event) => event.name),
@@ -713,7 +716,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final consumedY = tester.getTopLeft(find.text('Consumed')).dy;
+      final consumedY = tester.getTopLeft(find.text('TODAY\'S ENERGY')).dy;
       final coachY = tester.getTopLeft(find.byKey(const Key('coach-card'))).dy;
       final proteinY = tester.getTopLeft(find.text('Protein')).dy;
 

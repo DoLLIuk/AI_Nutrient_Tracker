@@ -2,14 +2,29 @@ class ApiError {
   final String code;
   final String message;
   final String? requestId;
+  final String? clientTraceId;
   final int? statusCode;
 
   const ApiError({
     required this.code,
     required this.message,
     this.requestId,
+    this.clientTraceId,
     this.statusCode,
   });
+
+  /// Reference that support can use even when the request never reached API.
+  String? get diagnosticId => clientTraceId ?? requestId;
+
+  ApiError withTrace({String? requestId, String? clientTraceId}) {
+    return ApiError(
+      code: code,
+      message: message,
+      requestId: requestId ?? this.requestId,
+      clientTraceId: clientTraceId ?? this.clientTraceId,
+      statusCode: statusCode,
+    );
+  }
 
   factory ApiError.fromEnvelope(Map<String, dynamic> json, {int? statusCode}) {
     final envelope = json['error'];
@@ -51,6 +66,8 @@ String mapErrorCodeToMessage(String code) {
       return 'Portion must be between 1 and 2000 g.';
     case 'RATE_LIMITED':
       return 'Too many requests. Please try again later.';
+    case 'REQUEST_TIMEOUT':
+      return 'Analysis is taking too long. Please try again.';
     case 'PROVIDER_TIMEOUT':
       return 'Analysis took too long. Please try again.';
     case 'PROVIDER_REQUEST_FAILED':
