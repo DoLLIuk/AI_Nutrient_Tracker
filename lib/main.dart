@@ -3110,10 +3110,8 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
   }) {
     final isOverTarget = over > 0;
     final statusValue = isOverTarget ? over : remaining;
-    // Keep the metric itself white for reliable contrast on the gradient.
-    // The overage state gets its own high-chroma badge and progress segment
-    // instead of tinting three lines of text a low-contrast warm color.
-    const statusColor = Colors.white;
+    const overAccent = Color(0xFFFF5A45);
+    final statusColor = isOverTarget ? overAccent : Colors.white;
     return Container(
       key: const Key('calorie-status-card'),
       width: double.infinity,
@@ -3124,7 +3122,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: isOverTarget
-              ? const [Color(0xFF3B77FF), Color(0xFF7036DE)]
+              ? const [Color(0xFF3B77FF), Color(0xFFA637E9)]
               : const [Color(0xFF3B77FF), Color(0xFF8D2EF4)],
         ),
       ),
@@ -3978,71 +3976,56 @@ class _CalorieStatusValue extends StatelessWidget {
     final alignment = alignEnd
         ? CrossAxisAlignment.end
         : CrossAxisAlignment.start;
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: alignment,
-        children: [
-          if (isOverTarget)
-            Container(
-              key: const Key('calorie-over-badge'),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFF73A61), Color(0xFFDB2451)],
-                ),
-                borderRadius: BorderRadius.circular(99),
-                border: Border.all(color: const Color(0x66FFFFFF)),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x330A1025),
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Text(
-                label,
-                key: const Key('calorie-status-label'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            )
-          else
-            Text(
-              label,
-              key: alignEnd ? const Key('calorie-status-label') : null,
-              style: TextStyle(
-                color: color.withValues(alpha: alignEnd ? 1 : 0.9),
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          SizedBox(height: isOverTarget ? 7 : 18),
-          Text(
-            value,
-            key: alignEnd ? const Key('calorie-status-value') : null,
-            style: TextStyle(
-              color: color,
-              fontSize: 50,
-              height: 0.95,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 9),
-          Text(
-            subtitle,
-            key: alignEnd ? const Key('calorie-status-subtitle') : null,
-            style: TextStyle(
-              color: color.withValues(alpha: alignEnd ? 0.9 : 0.85),
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
+    final label = Text(
+      this.label,
+      key: alignEnd ? const Key('calorie-status-label') : null,
+      style: TextStyle(
+        color: color.withValues(alpha: alignEnd ? 1 : 0.9),
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
       ),
+    );
+    final metric = Column(
+      crossAxisAlignment: alignment,
+      children: [
+        label,
+        SizedBox(height: isOverTarget ? 10 : 18),
+        Text(
+          value,
+          key: alignEnd ? const Key('calorie-status-value') : null,
+          style: TextStyle(
+            color: color,
+            fontSize: 50,
+            height: 0.95,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          subtitle,
+          key: alignEnd ? const Key('calorie-status-subtitle') : null,
+          style: TextStyle(
+            color: color.withValues(alpha: alignEnd ? 0.92 : 0.85),
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+    return Expanded(
+      child: isOverTarget
+          ? Container(
+              key: const Key('calorie-over-status-panel'),
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0x73150F32),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0x33FFFFFF)),
+              ),
+              child: metric,
+            )
+          : metric,
     );
   }
 }
@@ -4061,13 +4044,18 @@ class _CalorieProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOverTarget = over > 0;
-    final targetPosition = isOverTarget ? 0.72 : 1.0;
+    // Once over the goal, the whole rail becomes a scaled comparison of
+    // target versus consumed calories. It ends with the overflow segment,
+    // so there is no ambiguous unfilled tail.
+    final targetPosition = isOverTarget
+        ? target <= 0
+              ? 0.0
+              : (target / (target + over)).clamp(0.0, 1.0)
+        : 1.0;
     final filledPosition = isOverTarget
         ? targetPosition
         : progress.clamp(0.0, 1.0);
-    final overflowPosition = isOverTarget
-        ? min(0.28, (over / target) * 0.5)
-        : 0.0;
+    final overflowPosition = isOverTarget ? 1.0 - targetPosition : 0.0;
 
     return Column(
       children: [
@@ -4106,7 +4094,7 @@ class _CalorieProgressBar extends StatelessWidget {
                       width: constraints.maxWidth * overflowPosition,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF73A61),
+                          color: const Color(0xFFFF5A45),
                           borderRadius: BorderRadius.circular(99),
                         ),
                       ),
