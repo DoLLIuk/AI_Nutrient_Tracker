@@ -101,9 +101,23 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
         _requestTimeout,
       );
       return _parseResponseOrThrow(statusCode: streamed.statusCode, body: body);
+    } on http.ClientException {
+      throw const ApiException(
+        ApiError(
+          code: 'CONNECTION_ERROR',
+          message: 'Could not connect to the analysis service',
+        ),
+      );
     } on SocketException {
       throw const ApiException(
         ApiError(code: 'NETWORK_ERROR', message: 'Network error'),
+      );
+    } on HandshakeException {
+      throw const ApiException(
+        ApiError(
+          code: 'SECURE_CONNECTION_ERROR',
+          message: 'Secure connection to the analysis service failed',
+        ),
       );
     } on TimeoutException {
       throw const ApiException(
@@ -147,9 +161,23 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
         statusCode: response.statusCode,
         body: response.body,
       );
+    } on http.ClientException {
+      throw const ApiException(
+        ApiError(
+          code: 'CONNECTION_ERROR',
+          message: 'Could not connect to the analysis service',
+        ),
+      );
     } on SocketException {
       throw const ApiException(
         ApiError(code: 'NETWORK_ERROR', message: 'Network error'),
+      );
+    } on HandshakeException {
+      throw const ApiException(
+        ApiError(
+          code: 'SECURE_CONNECTION_ERROR',
+          message: 'Secure connection to the analysis service failed',
+        ),
       );
     } on TimeoutException {
       throw const ApiException(
@@ -178,10 +206,48 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
     required int statusCode,
     required String body,
   }) {
-    final decoded = body.isEmpty ? null : jsonDecode(body);
+    dynamic decoded;
+    try {
+      decoded = body.isEmpty ? null : jsonDecode(body);
+    } on FormatException {
+      throw ApiException(
+        ApiError(
+          code: 'INVALID_SERVER_RESPONSE',
+          message: 'Analysis service returned an invalid response',
+          statusCode: statusCode,
+        ),
+      );
+    }
 
     if (statusCode >= 200 && statusCode < 300) {
-      return PhotoFoodResponse.fromJson(decoded as Map<String, dynamic>);
+      if (decoded is! Map<String, dynamic>) {
+        throw ApiException(
+          ApiError(
+            code: 'INVALID_SERVER_RESPONSE',
+            message: 'Analysis service returned an invalid response',
+            statusCode: statusCode,
+          ),
+        );
+      }
+      try {
+        return PhotoFoodResponse.fromJson(decoded);
+      } on FormatException {
+        throw ApiException(
+          ApiError(
+            code: 'INVALID_SERVER_RESPONSE',
+            message: 'Analysis service returned an invalid response',
+            statusCode: statusCode,
+          ),
+        );
+      } on TypeError {
+        throw ApiException(
+          ApiError(
+            code: 'INVALID_SERVER_RESPONSE',
+            message: 'Analysis service returned an invalid response',
+            statusCode: statusCode,
+          ),
+        );
+      }
     }
 
     if (decoded is Map<String, dynamic>) {

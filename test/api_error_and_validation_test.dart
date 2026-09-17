@@ -11,7 +11,7 @@ void main() {
         'code': 'UNAUTHORIZED',
         'message': 'Invalid key',
         'request_id': 'req_1',
-      }
+      },
     }, statusCode: 401);
 
     expect(error.code, 'UNAUTHORIZED');
@@ -20,8 +20,22 @@ void main() {
   });
 
   test('Error code mapping', () {
-    expect(mapErrorCodeToMessage('NO_FOOD_DETECTED'), 'No food detected in the photo.');
-    expect(mapErrorCodeToMessage('RATE_LIMITED'), 'Too many requests. Please try again later.');
+    expect(
+      mapErrorCodeToMessage('NO_FOOD_DETECTED'),
+      'No food detected in the photo.',
+    );
+    expect(
+      mapErrorCodeToMessage('RATE_LIMITED'),
+      'Too many requests. Please try again later.',
+    );
+    expect(
+      mapErrorCodeToMessage('CONNECTION_ERROR'),
+      'Cannot reach the analysis service. Check the connection and try again.',
+    );
+    expect(
+      mapErrorCodeToMessage('INVALID_SERVER_RESPONSE'),
+      'Analysis service returned an invalid response. Please try again.',
+    );
   });
 
   test('Portion validation', () {
@@ -29,7 +43,6 @@ void main() {
     expect(PhotoFoodController.validatePortionInput('2001'), isNotNull);
     expect(PhotoFoodController.validatePortionInput('250'), isNull);
   });
-
 
   test('Onboarding decode fallback handles unknown enums', () {
     final raw = jsonEncode({
@@ -49,4 +62,3 @@ void main() {
     expect(decoded.plan.proteinTargetG, greaterThan(0));
   });
 }
-

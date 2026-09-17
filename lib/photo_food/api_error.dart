@@ -63,6 +63,14 @@ String mapErrorCodeToMessage(String code) {
       return 'AI estimate is unavailable. Please enter grams manually.';
     case 'NETWORK_ERROR':
       return 'Network issue. Check your connection.';
+    case 'CONNECTION_ERROR':
+      return 'Cannot reach the analysis service. Check the connection and try again.';
+    case 'SECURE_CONNECTION_ERROR':
+      return 'Secure connection failed. Please try again later.';
+    case 'INVALID_SERVER_RESPONSE':
+      return 'Analysis service returned an invalid response. Please try again.';
+    case 'INTERNAL_ERROR':
+      return 'Something went wrong while processing the photo. Please try again.';
     default:
       return 'Could not process request. Please try again.';
   }
