@@ -3109,100 +3109,45 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     required double progress,
   }) {
     final isOverTarget = over > 0;
-    final statusText = isOverTarget
-        ? '${over.toStringAsFixed(0)} kcal over'
-        : '${remaining.toStringAsFixed(0)} kcal remaining';
-    final relativeStatus = isOverTarget
-        ? '+${((over / target) * 100).toStringAsFixed(0)}% above your daily target'
-        : '${(progress * 100).toStringAsFixed(0)}% of your daily target';
+    final statusValue = isOverTarget ? over : remaining;
+    final statusColor = isOverTarget ? const Color(0xFFFFB5AE) : Colors.white;
     return Container(
+      key: const Key('calorie-status-card'),
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF3B77FF), Color(0xFF8D2EF4)],
+          colors: isOverTarget
+              ? const [Color(0xFF3B77FF), Color(0xFFA637E9)]
+              : const [Color(0xFF3B77FF), Color(0xFF8D2EF4)],
         ),
       ),
       child: Column(
         children: [
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'TODAY\'S ENERGY',
-              style: TextStyle(
-                color: Color(0xDFFFFFFF),
-                fontSize: 12,
-                letterSpacing: 1.4,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                consumed.toStringAsFixed(0),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 48,
-                  height: 0.95,
-                  fontWeight: FontWeight.w800,
-                ),
+              _CalorieStatusValue(
+                label: 'Consumed',
+                value: consumed.toStringAsFixed(0),
+                subtitle: 'kcal',
+                alignEnd: false,
+                color: Colors.white,
               ),
-              const Padding(
-                padding: EdgeInsets.only(left: 8, bottom: 4),
-                child: Text(
-                  'kcal',
-                  style: TextStyle(
-                    color: Color(0xDFFFFFFF),
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isOverTarget
-                          ? const Color(0xFFFF665D)
-                          : const Color(0x2AFFFFFF),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      statusText,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
+              _CalorieStatusValue(
+                label: isOverTarget ? 'Over' : 'Remaining',
+                value: statusValue.toStringAsFixed(0),
+                subtitle: isOverTarget ? 'kcal over goal' : 'kcal',
+                alignEnd: true,
+                color: statusColor,
               ),
             ],
           ),
-          const SizedBox(height: 5),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'of ${target.toStringAsFixed(0)} kcal · $relativeStatus',
-              style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 13),
-            ),
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 22),
           _CalorieProgressBar(progress: progress, over: over, target: target),
         ],
       ),
@@ -4007,6 +3952,66 @@ class _CoachCard extends StatelessWidget {
   }
 }
 
+class _CalorieStatusValue extends StatelessWidget {
+  final String label;
+  final String value;
+  final String subtitle;
+  final bool alignEnd;
+  final Color color;
+
+  const _CalorieStatusValue({
+    required this.label,
+    required this.value,
+    required this.subtitle,
+    required this.alignEnd,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final alignment = alignEnd
+        ? CrossAxisAlignment.end
+        : CrossAxisAlignment.start;
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: alignment,
+        children: [
+          Text(
+            label,
+            key: alignEnd ? const Key('calorie-status-label') : null,
+            style: TextStyle(
+              color: color.withValues(alpha: alignEnd ? 1 : 0.9),
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            value,
+            key: alignEnd ? const Key('calorie-status-value') : null,
+            style: TextStyle(
+              color: color,
+              fontSize: 50,
+              height: 0.95,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 9),
+          Text(
+            subtitle,
+            key: alignEnd ? const Key('calorie-status-subtitle') : null,
+            style: TextStyle(
+              color: color.withValues(alpha: alignEnd ? 0.9 : 0.85),
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CalorieProgressBar extends StatelessWidget {
   final double progress;
   final double over;
@@ -4021,12 +4026,12 @@ class _CalorieProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOverTarget = over > 0;
-    final targetPosition = isOverTarget ? 0.82 : 1.0;
+    final targetPosition = isOverTarget ? 0.72 : 1.0;
     final filledPosition = isOverTarget
         ? targetPosition
         : progress.clamp(0.0, 1.0);
     final overflowPosition = isOverTarget
-        ? min(0.18, (over / target) * 0.18)
+        ? min(0.28, (over / target) * 0.5)
         : 0.0;
 
     return Column(
@@ -4059,6 +4064,7 @@ class _CalorieProgressBar extends StatelessWidget {
                   ),
                   if (isOverTarget)
                     Positioned(
+                      key: const Key('calorie-overflow-segment'),
                       left: constraints.maxWidth * targetPosition,
                       top: 0,
                       bottom: 0,
@@ -4072,6 +4078,7 @@ class _CalorieProgressBar extends StatelessWidget {
                     ),
                   if (isOverTarget)
                     Positioned(
+                      key: const Key('calorie-target-marker'),
                       left: (constraints.maxWidth * targetPosition) - 1,
                       top: -3,
                       bottom: -3,

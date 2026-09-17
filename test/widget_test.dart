@@ -716,12 +716,18 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final consumedY = tester.getTopLeft(find.text('TODAY\'S ENERGY')).dy;
+      final consumedY = tester
+          .getTopLeft(find.byKey(const Key('calorie-status-card')))
+          .dy;
       final coachY = tester.getTopLeft(find.byKey(const Key('coach-card'))).dy;
       final proteinY = tester.getTopLeft(find.text('Protein')).dy;
 
       expect(coachY, greaterThan(consumedY));
       expect(coachY, lessThan(proteinY));
+      expect(find.text('Remaining'), findsOneWidget);
+      expect(find.text('2000'), findsOneWidget);
+      expect(find.text('kcal over goal'), findsNothing);
+      expect(find.byKey(const Key('calorie-overflow-segment')), findsNothing);
       expect(find.text('Today\'s tip'), findsOneWidget);
       expect(find.text('Coach'), findsNothing);
       expect(find.text('Start your day'), findsOneWidget);
@@ -851,6 +857,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('You\'re past today\'s target'), findsOneWidget);
+    expect(find.text('Over'), findsOneWidget);
+    expect(find.text('200'), findsOneWidget);
+    expect(find.text('kcal over goal'), findsOneWidget);
+    expect(find.byKey(const Key('calorie-overflow-segment')), findsOneWidget);
+    expect(find.byKey(const Key('calorie-target-marker')), findsOneWidget);
     expect(
       find.text('If you eat again, keep it protein-first and light'),
       findsOneWidget,
