@@ -1,4 +1,4 @@
-# AI Calorie Tracker — Discovery, Beta, and Launch Plan
+# AI Nutrient Tracker — Discovery, Beta, and Launch Plan
 
 Updated: 2026-09-08
 

@@ -8,7 +8,7 @@ Last updated: 2026-07-06
 
 ## 1. Purpose
 
-This document collects future product goals for AI Calorie Tracker after the core food logging loop is validated.
+This document collects future product goals for AI Nutrient Tracker after the core food logging loop is validated.
 
 It is intentionally not the MVP source of truth. For current `Beta v1` scope, use [MVP_PRD.md](MVP_PRD.md). For future AI coach details, use [AI_NUTRITION_COACH.md](AI_NUTRITION_COACH.md).
 

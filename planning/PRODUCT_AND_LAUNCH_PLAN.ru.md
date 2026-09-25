@@ -1,4 +1,4 @@
-# План discovery, beta и запуска AI Calorie Tracker
+# План discovery, beta и запуска AI Nutrient Tracker
 
 Обновлено: 2026-09-08
 

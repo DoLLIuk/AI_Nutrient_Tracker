@@ -1,6 +1,6 @@
-# AI Calorie Tracker Agent Guide
+# AI Nutrient Tracker Agent Guide
 
-This document is the canonical engineering and AI-agent reference for the AI Calorie Tracker repository. In this iteration, the Dart and Flutter package name remains `my_new_app`.
+This document is the canonical engineering and AI-agent reference for the AI Nutrient Tracker repository. The Dart and Flutter package name remains `my_new_app`.
 
 Read this first if you need to understand:
 

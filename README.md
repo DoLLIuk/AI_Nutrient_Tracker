@@ -1,6 +1,6 @@
-# AI Calorie Tracker
+# AI Nutrient Tracker
 
-AI Calorie Tracker is a Flutter nutrition-tracking app focused on fast meal logging, AI-assisted food analysis, and daily progress that feels structured instead of noisy.
+AI Nutrient Tracker is a Flutter nutrition-tracking app focused on fast meal logging, AI-assisted food analysis, and daily progress that feels structured instead of noisy.
 
 ## At a Glance
 
@@ -46,7 +46,7 @@ The manual meal form supports linked calories/macros behavior, session-scoped fi
 ## Product Flow
 
 <p align="center">
-  <img src="docs/images/readme/ai-calorie-tracker-flow.gif" alt="AI Calorie Tracker product flow demo" width="320" />
+  <img src="docs/images/readme/ai-calorie-tracker-flow.gif" alt="AI Nutrient Tracker product flow demo" width="320" />
 </p>
 
 <p align="center">

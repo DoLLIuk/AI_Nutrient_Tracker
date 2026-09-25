@@ -1,6 +1,6 @@
 # Documentation Map
 
-This folder is the working memory for AI Calorie Tracker.
+This folder is the working memory for AI Nutrient Tracker.
 
 Use this map before changing product scope, architecture, AI behavior, or launch strategy.
 

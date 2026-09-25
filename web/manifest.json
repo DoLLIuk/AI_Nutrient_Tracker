@@ -1,6 +1,6 @@
 {
-    "name": "AI Calorie Tracker",
-    "short_name": "AI Tracker",
+    "name": "AI Nutrient Tracker",
+    "short_name": "Nutrient Tracker",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
