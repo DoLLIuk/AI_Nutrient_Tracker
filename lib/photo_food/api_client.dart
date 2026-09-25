@@ -11,6 +11,7 @@ import 'package:mime/mime.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app_config.dart';
+import '../demo_visitor.dart';
 import 'api_error.dart';
 import 'models.dart';
 import 'repository.dart';
@@ -25,7 +26,6 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
   static const Duration _requestTimeout = Duration(seconds: 25);
   static const String _pendingDiagnosticsKey =
       'photo_food.pending_client_diagnostics';
-  static const String _demoVisitorKey = 'demo.visitor_id';
 
   final AppConfig config;
   final http.Client _httpClient;
@@ -322,7 +322,7 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
 
   Future<Map<String, String>> _requestHeaders(String clientTraceId) async {
     final pending = await _pendingDiagnosticHeader();
-    final visitorId = kIsWeb ? await _demoVisitorId() : '';
+    final visitorId = kIsWeb ? await demoVisitorId() : '';
     final diagnosticHeader = pending == null
         ? const <String, String>{}
         : <String, String>{'X-Client-Diagnostics': pending};
@@ -332,21 +332,6 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
       if (visitorId.isNotEmpty) 'X-Demo-Visitor': visitorId,
       ...diagnosticHeader,
     };
-  }
-
-  Future<String> _demoVisitorId() async {
-    final preferences = await SharedPreferences.getInstance();
-    final existing = preferences.getString(_demoVisitorKey);
-    if (existing != null && RegExp(r'^[a-f0-9]{32}$').hasMatch(existing)) {
-      return existing;
-    }
-    final random = Random.secure();
-    final visitorId = List<int>.generate(
-      16,
-      (_) => random.nextInt(256),
-    ).map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
-    await preferences.setString(_demoVisitorKey, visitorId);
-    return visitorId;
   }
 
   Future<void> _enqueueClientDiagnostic(

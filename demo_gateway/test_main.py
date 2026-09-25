@@ -81,6 +81,35 @@ def test_missing_visitor_is_rejected(monkeypatch):
     assert response.status_code == 400
 
 
+def test_onboarding_event_is_admitted_without_profile_data(monkeypatch):
+    captured = {}
+
+    def reserve(*args):
+        captured["action"], captured["visitor"], captured["trace"], captured["name"], captured["step"] = args
+        return True
+
+    monkeypatch.setattr(main, "reserve_quota", reserve)
+    response = client.post(
+        "/v0/demo/event",
+        headers=HEADERS,
+        json={"name": "onboarding_step_viewed", "step": 2, "weight_kg": 65},
+    )
+    assert response.status_code == 200
+    assert captured["action"] == "event"
+    assert captured["name"] == "onboarding_step_viewed"
+    assert captured["step"] == 2
+
+
+def test_unknown_event_is_rejected_before_firestore(monkeypatch):
+    monkeypatch.setattr(main, "reserve_quota", lambda *args: (_ for _ in ()).throw(AssertionError()))
+    response = client.post(
+        "/v0/demo/event",
+        headers=HEADERS,
+        json={"name": "profile_weight_changed", "weight_kg": 65},
+    )
+    assert response.status_code == 400
+
+
 def test_firestore_reservation_enforces_visitor_and_shared_caps(monkeypatch):
     documents = {}
 

@@ -21,13 +21,19 @@ import 'photo_food/models.dart';
 import 'photo_food/photo_picker.dart';
 import 'photo_food/repository.dart';
 import 'profile/profile_page.dart';
+import 'web_demo_analytics.dart';
 
 part 'meal_edit_draft.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   Analytics? analytics;
-  if (_supportsFirebaseAnalytics) {
+  if (kIsWeb) {
+    final config = AppConfig.tryFromEnvironment();
+    if (config != null) {
+      analytics = WebDemoAnalytics(apiBaseUrl: config.apiBaseUrl);
+    }
+  } else if (_supportsFirebaseAnalytics) {
     try {
       await Firebase.initializeApp();
       analytics = FirebaseAnalyticsAdapter();

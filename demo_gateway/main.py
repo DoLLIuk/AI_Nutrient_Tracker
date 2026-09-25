@@ -20,8 +20,16 @@ ANALYSES_PER_VISITOR = 3
 ANALYSES_TOTAL = 50
 CONFIRMATIONS_PER_VISITOR = 9
 CONFIRMATIONS_TOTAL = 150
+EVENTS_PER_VISITOR = 60
+EVENTS_TOTAL = 1200
 VISITOR_PATTERN = re.compile(r"^[a-f0-9]{32}$")
 IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+EVENT_NAMES = {
+    "app_opened", "onboarding_started", "onboarding_step_viewed",
+    "onboarding_completed", "first_meal_logged", "meal_logged",
+    "meal_logged_in_existing_session", "meal_edited", "meal_deleted",
+    "photo_analysis_succeeded", "photo_analysis_failed", "manual_fallback_used",
+}
 
 ALLOWED_ORIGINS = [
     item.strip().rstrip("/")
@@ -78,17 +86,18 @@ def origin_allowed(request: Request) -> bool:
     return request.headers.get("origin", "").rstrip("/") in ALLOWED_ORIGINS
 
 
-def reserve_quota(action: str, visitor_hash: str, trace_id: str) -> bool:
+def reserve_quota(action: str, visitor_hash: str, trace_id: str, event_name=None, step=None) -> bool:
     client = firestore.Client()
     day = datetime.now(timezone.utc).date().isoformat()
     global_ref = client.collection("demo_daily").document(day)
     visitor_ref = client.collection("demo_daily_visitors").document(f"{day}_{visitor_hash}")
     event_ref = client.collection("demo_events").document(secrets.token_hex(12))
-    visitor_limit, total_limit = (
-        (ANALYSES_PER_VISITOR, ANALYSES_TOTAL)
-        if action == "analysis"
-        else (CONFIRMATIONS_PER_VISITOR, CONFIRMATIONS_TOTAL)
-    )
+    limits = {
+        "analysis": (ANALYSES_PER_VISITOR, ANALYSES_TOTAL),
+        "confirmation": (CONFIRMATIONS_PER_VISITOR, CONFIRMATIONS_TOTAL),
+        "event": (EVENTS_PER_VISITOR, EVENTS_TOTAL),
+    }
+    visitor_limit, total_limit = limits[action]
 
     @firestore.transactional
     def reserve(transaction):
@@ -106,13 +115,15 @@ def reserve_quota(action: str, visitor_hash: str, trace_id: str) -> bool:
             "visitor_hash": visitor_hash,
             "trace_id": trace_id,
             "outcome": "admitted",
+            **({"event_name": event_name} if event_name else {}),
+            **({"step": step} if step is not None else {}),
         })
         return True
 
     return reserve(client.transaction())
 
 
-async def admission(request: Request, action: str):
+async def admission(request: Request, action: str, event_name=None, step=None):
     if not origin_allowed(request):
         return None, error(403, "FORBIDDEN", "This demo origin is not allowed")
     try:
@@ -127,7 +138,7 @@ async def admission(request: Request, action: str):
     if not re.fullmatch(r"[a-zA-Z0-9_-]{1,100}", trace_id):
         trace_id = secrets.token_hex(12)
     try:
-        allowed = reserve_quota(action, visitor_hash, trace_id)
+        allowed = reserve_quota(action, visitor_hash, trace_id, event_name, step)
     except Exception:
         logging.exception("Firestore quota check failed")
         return None, error(503, "DEMO_UNAVAILABLE", "The demo is temporarily unavailable")
@@ -135,6 +146,30 @@ async def admission(request: Request, action: str):
         logging.info(json.dumps({"action": action, "outcome": "limited", "trace_id": trace_id}))
         return None, error(429, "RATE_LIMITED", "The daily demo limit has been reached. Try again tomorrow.")
     return (upstream, api_key, trace_id), None
+
+
+@app.post("/v0/demo/event")
+async def record_event(request: Request):
+    body = await request.body()
+    if len(body) > 1024:
+        return error(413, "VALIDATION_ERROR", "Event is too large")
+    try:
+        payload = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return error(400, "VALIDATION_ERROR", "Invalid JSON")
+    if (
+        not isinstance(payload, dict)
+        or not isinstance(payload.get("name"), str)
+        or payload["name"] not in EVENT_NAMES
+    ):
+        return error(400, "VALIDATION_ERROR", "Unknown event")
+    step = payload.get("step")
+    if isinstance(step, bool) or not isinstance(step, int) or not 0 <= step <= 6:
+        step = None
+    _, rejection = await admission(request, "event", payload["name"], step)
+    if rejection is not None:
+        return rejection
+    return {"ok": True}
 
 
 async def forward(url: str, api_key: str, trace_id: str, *, data=None, files=None, payload=None):

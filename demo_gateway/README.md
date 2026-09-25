@@ -2,7 +2,7 @@
 
 The GitHub Pages build uses `DEMO_API_BASE_URL` to call this Cloud Run service. The mobile `PHOTO_FOOD_API_KEY` stays in Secret Manager and is never placed in the public web bundle. The gateway forwards only photo analysis and portion confirmation.
 
-Firestore transactions reserve a request before it reaches the AI API. Current UTC daily limits are 3 analyses and 9 confirmations per browser ID, with shared caps of 50 analyses and 150 confirmations. Clearing browser storage can reset the browser limit, but cannot bypass the shared cap. `demo_events` records the UTC time, action, pseudonymous visitor hash, and trace ID for admitted calls. Photos and profile data are not logged. Rejected calls appear in Cloud Run logs without a Firestore event to avoid unlimited write costs.
+Firestore transactions reserve a request before it reaches the AI API. Current UTC daily limits are 3 analyses, 9 confirmations, and 60 app events per browser ID, with shared caps of 50 analyses, 150 confirmations, and 1200 events. Clearing browser storage can reset the browser limit, but cannot bypass the shared cap. `demo_events` records the UTC time, action, pseudonymous visitor hash, and trace ID for admitted calls. Allowlisted app events include onboarding progress and meal actions; only the onboarding step number is retained. Photos and profile data are not logged. Rejected calls appear in Cloud Run logs without a Firestore event to avoid unlimited write costs.
 
 ## Deployment prerequisites
 
