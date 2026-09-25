@@ -2,6 +2,8 @@
 
 AI Nutrient Tracker is a Flutter nutrition-tracking app focused on fast meal logging, AI-assisted food analysis, and daily progress that feels structured instead of noisy.
 
+**[Try the interactive browser demo](https://dolliuk.github.io/AI_Nutrient_Tracker/)** — use a sample meal photo or upload your own, complete the onboarding, and leave feedback at any point.
+
 ## At a Glance
 
 - Flutter mobile app for nutrition tracking
