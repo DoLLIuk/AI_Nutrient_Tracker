@@ -256,11 +256,12 @@ class _SettingsCard extends StatelessWidget {
   const _SettingsCard({required this.child});
 
   @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: Colors.white,
+  Widget build(BuildContext context) => Material(
+    color: Colors.white,
+    clipBehavior: Clip.antiAlias,
+    shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: const Color(0xFFE9EBF2)),
+      side: const BorderSide(color: Color(0xFFE9EBF2)),
     ),
     child: child,
   );
