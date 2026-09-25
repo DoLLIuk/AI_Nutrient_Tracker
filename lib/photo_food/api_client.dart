@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
@@ -24,6 +25,7 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
   static const Duration _requestTimeout = Duration(seconds: 25);
   static const String _pendingDiagnosticsKey =
       'photo_food.pending_client_diagnostics';
+  static const String _demoVisitorKey = 'demo.visitor_id';
 
   final AppConfig config;
   final http.Client _httpClient;
@@ -95,7 +97,9 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
       http.MultipartFile.fromBytes(
         'image',
         imageBytes,
-        filename: _fileNameFromPath(image.path),
+        filename: image.name.isNotEmpty
+            ? image.name
+            : _fileNameFromPath(image.path),
         contentType: MediaType(mimeParts[0], mimeParts[1]),
       ),
     );
@@ -317,14 +321,31 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
 
   Future<Map<String, String>> _requestHeaders(String clientTraceId) async {
     final pending = await _pendingDiagnosticHeader();
+    final visitorId = kIsWeb ? await _demoVisitorId() : '';
     final diagnosticHeader = pending == null
         ? const <String, String>{}
         : <String, String>{'X-Client-Diagnostics': pending};
     return {
-      'X-API-Key': config.apiKey,
+      if (config.apiKey.isNotEmpty) 'X-API-Key': config.apiKey,
       'X-Client-Trace-ID': clientTraceId,
+      if (visitorId.isNotEmpty) 'X-Demo-Visitor': visitorId,
       ...diagnosticHeader,
     };
+  }
+
+  Future<String> _demoVisitorId() async {
+    final preferences = await SharedPreferences.getInstance();
+    final existing = preferences.getString(_demoVisitorKey);
+    if (existing != null && RegExp(r'^[a-f0-9]{32}$').hasMatch(existing)) {
+      return existing;
+    }
+    final random = Random.secure();
+    final visitorId = List<int>.generate(
+      16,
+      (_) => random.nextInt(256),
+    ).map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
+    await preferences.setString(_demoVisitorKey, visitorId);
+    return visitorId;
   }
 
   Future<void> _enqueueClientDiagnostic(

@@ -807,10 +807,16 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       return;
     }
 
+    final samplePath = action == _AddAction.sample
+        ? await _showSampleMealsSheet()
+        : null;
+    if (action == _AddAction.sample && samplePath == null) return;
     final source = action == _AddAction.camera
         ? PickSource.camera
         : PickSource.gallery;
-    final pickedFile = await widget.controller.pickImage(source);
+    final pickedFile = samplePath == null
+        ? await widget.controller.pickImage(source)
+        : await widget.controller.pickSampleImage(samplePath);
     if (!mounted || pickedFile == null) return;
 
     final clarification = await _showClarificationBottomSheet();
@@ -819,7 +825,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     await widget.controller.analyzePickedImage(clarification: clarification);
     if (!mounted) return;
     final photoState = widget.controller.state;
-    final sourceName = source.name;
+    final sourceName = samplePath == null ? source.name : 'sample';
     if (photoState.status == HomeStatus.error) {
       widget.analytics.track(
         AnalyticsEvent(
@@ -862,18 +868,28 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.photoAnalysisAvailable) ...[
-                ListTile(
-                  key: const Key('pick-camera'),
-                  leading: const Icon(Icons.photo_camera_outlined),
-                  title: const Text('Take photo'),
-                  onTap: () => Navigator.of(context).pop(_AddAction.camera),
-                ),
+                if (!kIsWeb)
+                  ListTile(
+                    key: const Key('pick-camera'),
+                    leading: const Icon(Icons.photo_camera_outlined),
+                    title: const Text('Take photo'),
+                    onTap: () => Navigator.of(context).pop(_AddAction.camera),
+                  ),
                 ListTile(
                   key: const Key('pick-gallery'),
                   leading: const Icon(Icons.photo_library_outlined),
-                  title: const Text('Choose from gallery'),
+                  title: Text(
+                    kIsWeb ? 'Upload a photo' : 'Choose from gallery',
+                  ),
                   onTap: () => Navigator.of(context).pop(_AddAction.gallery),
                 ),
+                if (kIsWeb)
+                  ListTile(
+                    key: const Key('pick-sample'),
+                    leading: const Icon(Icons.restaurant_outlined),
+                    title: const Text('Try a sample meal'),
+                    onTap: () => Navigator.of(context).pop(_AddAction.sample),
+                  ),
               ] else
                 const ListTile(
                   key: Key('photo-analysis-unavailable'),
@@ -894,6 +910,60 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
           ),
         );
       },
+    );
+  }
+
+  Future<String?> _showSampleMealsSheet() {
+    return showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: SizedBox(
+          height: min(MediaQuery.sizeOf(context).height * 0.72, 520),
+          child: Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 8, 20, 14),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Choose a sample meal',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _sampleMeals.length,
+                  itemBuilder: (context, index) {
+                    final meal = _sampleMeals[index];
+                    return ListTile(
+                      key: Key('sample-meal-$index'),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 5,
+                      ),
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.asset(
+                          meal.path,
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      title: Text(meal.name),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () => Navigator.of(context).pop(meal.path),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -3326,7 +3396,18 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
   }
 }
 
-enum _AddAction { camera, gallery, manual }
+enum _AddAction { camera, gallery, sample, manual }
+
+const _sampleMeals = <({String name, String path})>[
+  (name: 'Chicken, rice & broccoli', path: 'assets/demo_food/chicken_rice.jpg'),
+  (name: 'Salmon & quinoa', path: 'assets/demo_food/salmon_quinoa.jpg'),
+  (
+    name: 'Spaghetti Bolognese',
+    path: 'assets/demo_food/spaghetti_bolognese.jpg',
+  ),
+  (name: 'Burger & fries', path: 'assets/demo_food/burger_fries.jpg'),
+  (name: 'Oatmeal & berries', path: 'assets/demo_food/oatmeal_berries.jpg'),
+];
 
 enum MealOrigin { ai, manual }
 

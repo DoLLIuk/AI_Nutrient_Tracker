@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 enum GoalType { loseWeight, maintain, gainWeight, trackOnly }
@@ -170,6 +171,19 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   void _startOnboarding() {
     widget.onStarted?.call();
     _nextStep();
+  }
+
+  void _continueWithSampleProfile() {
+    _setStateAndNotify(() {
+      _sexType = SexType.female;
+      _heightUnit = HeightUnit.cm;
+      _weightUnit = WeightUnit.kg;
+      _ageController.text = '30';
+      _heightController.text = '165';
+      _weightController.text = '65';
+      _basicProfileError = null;
+    });
+    if (_validateBasicProfile()) _nextStep();
   }
 
   @override
@@ -352,21 +366,30 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             onContinue: () {
               if (_validateBasicProfile()) _nextStep();
             },
-            child: _BasicProfileStep(
-              sexType: _sexType,
-              ageController: _ageController,
-              heightController: _heightController,
-              feetController: _feetController,
-              inchesController: _inchesController,
-              weightController: _weightController,
-              heightUnit: _heightUnit,
-              weightUnit: _weightUnit,
-              errorText: _basicProfileError,
-              onSexChanged: (v) => _setStateAndNotify(() => _sexType = v),
-              onHeightUnitChanged: (v) =>
-                  _setStateAndNotify(() => _heightUnit = v),
-              onWeightUnitChanged: (v) =>
-                  _setStateAndNotify(() => _weightUnit = v),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (kIsWeb) ...[
+                  _SampleProfileCard(onContinue: _continueWithSampleProfile),
+                  const SizedBox(height: 22),
+                ],
+                _BasicProfileStep(
+                  sexType: _sexType,
+                  ageController: _ageController,
+                  heightController: _heightController,
+                  feetController: _feetController,
+                  inchesController: _inchesController,
+                  weightController: _weightController,
+                  heightUnit: _heightUnit,
+                  weightUnit: _weightUnit,
+                  errorText: _basicProfileError,
+                  onSexChanged: (v) => _setStateAndNotify(() => _sexType = v),
+                  onHeightUnitChanged: (v) =>
+                      _setStateAndNotify(() => _heightUnit = v),
+                  onWeightUnitChanged: (v) =>
+                      _setStateAndNotify(() => _weightUnit = v),
+                ),
+              ],
             ),
           ),
           3 => _StepScaffold(
@@ -648,6 +671,47 @@ class _GoalStep extends StatelessWidget {
           onTap: () => onSelected(GoalType.trackOnly),
         ),
       ],
+    );
+  }
+}
+
+class _SampleProfileCard extends StatelessWidget {
+  final VoidCallback onContinue;
+
+  const _SampleProfileCard({required this.onContinue});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF4FF),
+        border: Border.all(color: const Color(0xFFC9D8FF)),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Just exploring?',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            'Sample details: female · 30 years · 165 cm · 65 kg',
+            style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              key: const Key('use-sample-profile'),
+              onPressed: onContinue,
+              child: const Text('Continue with sample profile'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1171,38 +1235,34 @@ class _ChoiceCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: const TextStyle(
-                              fontSize: 23,
-                              fontWeight: FontWeight.w700,
-                            ),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 23,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (badge != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2563EB),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          badge!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
                           ),
                         ),
-                        if (badge != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2563EB),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              badge!,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
                       subtitle,

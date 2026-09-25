@@ -1,0 +1,83 @@
+name: Web Demo Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-demo-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Keep the site unpublished until the separately protected demo API and
+    # the full demo journey have been verified.
+    if: ${{ vars.WEB_DEMO_READY == 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Test Flutter app
+        run: flutter test
+
+      - name: Test demo gateway
+        run: |
+          python -m pip install -r demo_gateway/requirements.txt pytest
+          python -m pytest -q demo_gateway/test_main.py
+
+      - name: Verify public demo API URL
+        shell: bash
+        env:
+          DEMO_API_BASE_URL: ${{ vars.DEMO_API_BASE_URL }}
+        run: |
+          if [[ "$DEMO_API_BASE_URL" != https://* ]]; then
+            echo "::error::DEMO_API_BASE_URL must be an HTTPS demo gateway URL"
+            exit 1
+          fi
+
+      - name: Build Flutter Web
+        env:
+          DEMO_API_BASE_URL: ${{ vars.DEMO_API_BASE_URL }}
+        run: >-
+          flutter build web --release
+          --base-href /AI_Nutrient_Tracker/
+          --dart-define=DEMO_API_BASE_URL="$DEMO_API_BASE_URL"
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

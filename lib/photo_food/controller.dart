@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'api_error.dart';
@@ -64,6 +65,18 @@ class PhotoFoodController extends ChangeNotifier {
     _lastPickedFile = pickedFile;
     _setState(_state.copyWith(status: HomeStatus.idle));
     return pickedFile;
+  }
+
+  Future<XFile> pickSampleImage(String assetPath) async {
+    final data = await rootBundle.load(assetPath);
+    final file = XFile.fromData(
+      data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      name: assetPath.split('/').last,
+      mimeType: 'image/jpeg',
+    );
+    _lastPickedFile = file;
+    _setState(_state.copyWith(status: HomeStatus.idle, clearError: true));
+    return file;
   }
 
   Future<void> analyzePickedImage({
