@@ -1,6 +1,6 @@
 # Interactive web demo brief
 
-Status: product brief agreed in conversation; implementation has not started.
+Status: responsive site shell and Formspree feedback are implemented locally. AI demo access, curated photos, onboarding shortcut, analytics, and GitHub Pages deployment remain to be built.
 
 ## Purpose and scope
 
@@ -31,7 +31,7 @@ Status: product brief agreed in conversation; implementation has not started.
 - Mobile: reserve a persistent site-level **Feedback** control outside the app's own controls. It opens a form and returns the visitor to the same app state when closed.
 - Feedback is available throughout the journey, including during onboarding. No app-internal feedback feature is required.
 - The form contains a required comment and an optional reply email. Attach only useful context such as demo version and current screen; do not attach photos, profile measurements, or meal details.
-- Recommended delivery for the first demo: a custom-styled site form submitted to Formspree. Formspree stores submissions in its dashboard and emails a notification to the project owner's configured address, which was supplied privately in conversation and must be set in the service rather than committed to the public repository. The Free plan currently allows 50 submissions per month and stores 30 days of history, so keep a copy of feedback that matters. The photo-analysis backend does not receive feedback. Configure spam filtering and verify the end-to-end submission before launch.
+- The custom-styled site form submits to Formspree form ID `xoevlpvb`. A local test submission returned success; the owner should confirm that its notification arrived at the configured inbox. Formspree stores submissions in its dashboard and emails a notification to the project owner's configured address, which was supplied privately in conversation and must be set in the service rather than committed to the public repository. The Free plan currently allows 50 submissions per month and stores 30 days of history, so keep a copy of feedback that matters. The photo-analysis backend does not receive feedback. Keep spam filtering enabled.
 
 ## Hosting decision
 
@@ -61,6 +61,6 @@ Status: product brief agreed in conversation; implementation has not started.
 ## Details to finalize before integration
 
 - Confirm that the GitHub repository has been renamed to `AI_Nutrient_Tracker` and the remote is reachable.
-- Formspree account/form ID, verified delivery to the privately supplied email address, and retention preference for submissions.
+- Verify Formspree notification delivery to the privately supplied email address and decide whether 30-day submission retention is sufficient.
 - Initial demo request limits and total daily AI spend ceiling.
 - Final deployment URL after GitHub Pages is enabled.

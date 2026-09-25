@@ -1,46 +1,87 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
-
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Flutter nutrition tracker with AI-powered photo meal logging, calorie goals, and session-based meal history.">
-
-  <!-- iOS meta tags & icons -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Try AI Nutrient Tracker: set a nutrition goal, log meals, and explore your daily progress.">
+  <meta name="theme-color" content="#f6f7f2">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="AI Nutrient Tracker">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>AI Nutrient Tracker</title>
+  <link rel="icon" type="image/png" href="favicon.png">
   <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="demo.css">
+  <title>AI Nutrient Tracker — Interactive Demo</title>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
+  <div class="site-shell">
+    <header class="site-header">
+      <a class="brand" href="#demo" aria-label="AI Nutrient Tracker demo">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span>AI Nutrient Tracker</span>
+      </a>
+      <span class="header-label">Interactive project demo</span>
+    </header>
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
+    <main class="demo-layout" id="demo">
+      <section class="intro" aria-labelledby="intro-title">
+        <p class="eyebrow"><span class="eyebrow-dot"></span> Try the product</p>
+        <h1 id="intro-title">A clearer way to see what you eat.</h1>
+        <p class="intro-copy">Set a goal, add a meal, and see how your day takes shape. Explore the real app directly in your browser.</p>
+        <a class="intro-link" href="#app-preview">Start exploring <span aria-hidden="true">↗</span></a>
+        <div class="intro-note">
+          <span class="note-line"></span>
+          <p>Your saved demo profile and meals stay in this browser. Photos are sent for analysis. Food estimates are guidance, not medical advice.</p>
+        </div>
+      </section>
+
+      <section class="app-column" id="app-preview" aria-label="Interactive app preview">
+        <div class="app-caption">
+          <span class="live-indicator"><span></span> LIVE APP</span>
+          <span>Explore at your own pace</span>
+        </div>
+        <div class="device-frame">
+          <div id="flutter_host" role="application" aria-label="AI Nutrient Tracker app">
+            <div class="app-loading" id="app-loading" role="status">Loading the interactive demo…</div>
+          </div>
+        </div>
+        <p class="app-undertext">The app runs here. You can come back to feedback at any point.</p>
+      </section>
+
+      <aside class="feedback-panel" id="feedback-panel" aria-labelledby="feedback-title">
+        <button class="feedback-close" id="feedback-close" type="button" aria-label="Close feedback">×</button>
+        <div class="feedback-top">
+          <p class="eyebrow">Help shape the experience</p>
+          <h2 id="feedback-title">What did you think?</h2>
+          <p>One honest note helps more than a long survey. Tell me what felt clear, confusing, or missing.</p>
+        </div>
+        <form id="feedback-form" action="https://formspree.io/f/xoevlpvb" method="POST">
+          <label for="feedback-message">Your feedback <span aria-hidden="true">*</span></label>
+          <textarea id="feedback-message" name="message" rows="5" minlength="5" maxlength="3000" required placeholder="I tried the onboarding and…"></textarea>
+          <label for="feedback-email">Email <span class="optional">(optional)</span></label>
+          <input id="feedback-email" name="email" type="email" autocomplete="email" placeholder="Only if you'd like a reply">
+          <div class="honeypot" aria-hidden="true">
+            <label for="feedback-website">Leave this field empty</label>
+            <input id="feedback-website" name="_gotcha" type="text" tabindex="-1" autocomplete="off">
+          </div>
+          <button class="submit-button" id="feedback-submit" type="submit">Send feedback <span aria-hidden="true">↗</span></button>
+          <p class="form-status" id="feedback-status" role="status" aria-live="polite"></p>
+        </form>
+        <p class="feedback-privacy">Your message and optional reply email go to Formspree. Photos and profile details are not attached. Please don't include sensitive health details.</p>
+      </aside>
+    </main>
+
+    <footer class="site-footer">
+      <span>AI Nutrient Tracker</span>
+      <span>Built to make food logging feel simpler.</span>
+    </footer>
+  </div>
+
+  <button class="feedback-trigger" id="feedback-trigger" type="button" aria-controls="feedback-panel" aria-expanded="false">Feedback <span aria-hidden="true">↗</span></button>
+  <div class="feedback-backdrop" id="feedback-backdrop" hidden></div>
+
+  <script src="demo.js" defer></script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
