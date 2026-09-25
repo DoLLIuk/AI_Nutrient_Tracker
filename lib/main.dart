@@ -4245,12 +4245,22 @@ class _MacroCard extends StatelessWidget {
             style: const TextStyle(fontSize: 12, color: Color(0xFF7E8293)),
           ),
           const SizedBox(height: 4),
-          Text(
-            amount,
-            style: TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.w700,
-              color: amountColor,
+          SizedBox(
+            width: double.infinity,
+            height: 38,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                amount,
+                maxLines: 1,
+                softWrap: false,
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w700,
+                  color: amountColor,
+                ),
+              ),
             ),
           ),
           Text(
