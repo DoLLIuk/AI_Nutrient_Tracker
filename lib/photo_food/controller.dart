@@ -103,7 +103,10 @@ class PhotoFoodController extends ChangeNotifier {
           error: e.error,
         ),
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('Photo analysis failed unexpectedly: $error\n$stackTrace');
+      }
       _setState(
         const HomeState(
           status: HomeStatus.error,

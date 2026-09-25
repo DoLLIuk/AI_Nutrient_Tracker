@@ -315,7 +315,8 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
 
   String _newClientTraceId() {
     final timestamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
-    final random = Random.secure().nextInt(1 << 32).toRadixString(36);
+    // Keep the bound below 2^32 for the JavaScript secure-random runtime.
+    final random = Random.secure().nextInt(1 << 31).toRadixString(36);
     return 'cli_$timestamp$random';
   }
 
