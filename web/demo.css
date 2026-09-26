@@ -63,7 +63,7 @@ a { color: inherit; }
   grid-template-columns: minmax(210px, 1fr) minmax(370px, 420px) minmax(255px, 320px);
   align-items: start;
   gap: clamp(28px, 3.5vw, 64px);
-  padding: 24px 0 42px;
+  padding: 24px 0 8px;
 }
 .intro { max-width: 460px; padding-top: 36px; }
 .eyebrow {
@@ -239,7 +239,7 @@ a { color: inherit; }
 }
 .feedback-close, .feedback-trigger, .feedback-backdrop { display: none; }
 .site-footer {
-  padding: 14px 0 24px;
+  padding: 8px 0 12px;
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 11px;
@@ -327,7 +327,7 @@ a { color: inherit; }
   .app-caption { padding: 0 2px; margin-bottom: 10px; }
   .device-frame { padding: 5px; border-radius: 25px; }
   #flutter_host { border-radius: 20px; }
-  .site-footer { padding-bottom: 78px; }
+  .site-footer { padding: 14px 0 78px; }
   .feedback-panel { width: min(390px, 100vw); border-radius: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
