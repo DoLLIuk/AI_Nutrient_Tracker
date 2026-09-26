@@ -30,6 +30,8 @@ GitHub Pages serves `web/` and the compiled Flutter app. The app runs inside `#f
 - Manual logging remains available after photo errors or quota exhaustion.
 - Desktop has a short three-step guide, the app, and the feedback form. At widths up to 1040 px, feedback uses a persistent button and drawer. At widths up to 640 px, the intro guide is hidden and the page stacks vertically.
 - Desktop content starts 24 px below the header. The intro has 36 px top padding, matching the app caption's 21 px height plus 15 px bottom margin. Mobile retains its own 27 px content padding and zero intro top padding.
+- The Flutter host keeps a 9:19.5 aspect ratio at every breakpoint. Its height follows its width, not the browser's height; short windows scroll the surrounding page. The mobile app column is capped at 420 px to avoid a wide, almost square frame. Browser toolbars or orientation changes must not squash the app.
+- One compact footer carries the usage-event notice. There is no separate under-app notice or marketing tagline reserving extra space below the frame.
 - Profile/meal persistence and quota identity are browser-local. Clearing site storage removes local demo data and creates a new browser ID; it cannot reset the global quota.
 
 ## Current quotas

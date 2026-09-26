@@ -140,7 +140,10 @@ a { color: inherit; }
   position: relative;
   overflow: hidden;
   width: 100%;
-  height: clamp(600px, calc(100vh - 210px), 810px);
+  /* Keep a phone-shaped viewport even in short browser windows. The page
+     scrolls around the frame; browser chrome must not squash the app. */
+  height: auto;
+  aspect-ratio: 9 / 19.5;
   border-radius: 30px;
   background: #fff;
 }
@@ -151,12 +154,6 @@ a { color: inherit; }
   place-items: center;
   color: var(--muted);
   font-size: 13px;
-}
-.app-undertext {
-  margin: 19px 0 0;
-  color: #87928a;
-  font-size: 11px;
-  text-align: center;
 }
 
 .feedback-panel {
@@ -242,15 +239,13 @@ a { color: inherit; }
 }
 .feedback-close, .feedback-trigger, .feedback-backdrop { display: none; }
 .site-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 20px 0 30px;
+  padding: 14px 0 24px;
   border-top: 1px solid var(--line);
-  color: #8d9890;
-  font-size: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
 }
-.site-footer span:first-child { color: #607369; font-weight: 700; }
+.site-footer p { margin: 0; }
 
 @media (max-width: 1230px) {
   .demo-layout { grid-template-columns: minmax(180px, 1fr) minmax(350px, 420px) minmax(240px, 290px); gap: 25px; }
@@ -328,13 +323,11 @@ a { color: inherit; }
   .intro h1 { max-width: 450px; font-size: clamp(34px, 9vw, 45px); }
   .intro-copy { margin: 16px 0 0; font-size: 13px; line-height: 1.6; }
   .intro-guide, .intro-note { display: none; }
-  .app-column { width: 100%; }
+  .app-column { width: 100%; max-width: 420px; align-self: center; }
   .app-caption { padding: 0 2px; margin-bottom: 10px; }
   .device-frame { padding: 5px; border-radius: 25px; }
-  #flutter_host { height: min(730px, 78dvh); min-height: 550px; border-radius: 20px; }
-  .app-undertext { padding: 0 20px; }
+  #flutter_host { border-radius: 20px; }
   .site-footer { padding-bottom: 78px; }
-  .site-footer span:last-child { display: none; }
   .feedback-panel { width: min(390px, 100vw); border-radius: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
