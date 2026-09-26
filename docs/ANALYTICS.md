@@ -2,7 +2,13 @@
 
 Status: event schema, in-app instrumentation, Firebase adapter, and Android/iOS Firebase configuration files are implemented. Android DebugView is verified; iOS verification is still required.
 
-Last updated: 2026-07-11
+Last updated: 2026-09-26
+
+## Web demo transport
+
+The public web demo uses `WebDemoAnalytics`, not Firebase Analytics for Web. It sends allowlisted event names and only the optional onboarding `step` to the Cloud Run gateway. Other event properties in the native contract below are discarded by the web adapter. Firestore `demo_events` stores server time, event name, pseudonymous visitor hash, and a diagnostic trace ID. Photos, meal contents, and body measurements are excluded. The trace ID belongs to the gateway operational log, not the native analytics payload.
+
+Collection is best effort and capped at 60 app events per browser ID and 1,200 globally per UTC day. A browser ID is not an authenticated person. These incomplete web events do not support all native beta cohort metrics below, particularly session-based activation. See [WEB_DEMO.md](WEB_DEMO.md) for counters, privacy boundaries, and operating details.
 
 ## Purpose
 

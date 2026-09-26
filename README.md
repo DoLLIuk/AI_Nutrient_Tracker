@@ -140,7 +140,9 @@ This repository is the Flutter client. It owns:
 - manual meal editing behavior
 - backend integration for photo-food analysis
 
-The backend is a separate service and is used here as an API dependency, not embedded in this repository.
+The AI analysis backend is a separate service. This repository also contains the public web demo shell and its quota-enforcing Cloud Run gateway in `demo_gateway/`.
+
+Web demo flow: `GitHub Pages / Flutter Web -> Cloud Run gateway -> existing AI API`. Firestore stores request counters and pseudonymous usage events; Formspree receives feedback separately. See [Web demo operations](docs/WEB_DEMO.md) for deployment, limits, data handling, and troubleshooting.
 
 For local development, the companion backend lives at
 `C:\\Users\\golov\\rofl_codex\\backend_for_diet_app`. Production runs on GCP
@@ -190,12 +192,14 @@ The app currently integrates with a separate backend through:
 - `POST /v0/ai/photo-food`
 - `POST /v0/ai/photo-food/confirm-portion`
 
-Auth/config used by the client:
+Native app auth/config:
 
 - header: `X-API-Key`
 - compile-time config:
   - `API_BASE_URL`
   - `API_KEY`
+
+Web builds use only `DEMO_API_BASE_URL` and send a random browser identifier to the gateway. Never put the AI API key in a web build. The deployed gateway accepts the production site origin; local photo analysis requires a separately configured development gateway.
 
 ## Setup
 
@@ -247,7 +251,7 @@ The current test coverage focuses on:
 - API configuration is passed through `--dart-define` values at build/run time.
 - A large amount of orchestration and UI logic still lives in `lib/main.dart`.
 - Persistence is local-only and uses `SharedPreferences`, not a richer local database.
-- Deployment is currently a manual Flutter build flow with no CI/CD pipeline in this repo.
+- Web demo deployment is automated from `main` through GitHub Actions. Cloud Run gateway deployment is separate and manual; mobile release distribution remains separate.
 - Some profile surfaces are presentational rather than fully backed by real historical analytics.
 
 ## Next Improvements

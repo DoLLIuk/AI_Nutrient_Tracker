@@ -22,6 +22,8 @@ This repository contains a Flutter calorie-tracking client with three core jobs:
 
 The app is intentionally client-heavy for local UX and persistence, but photo understanding is delegated to a separate backend API.
 
+The public browser demo is live on GitHub Pages. This repo also owns `web/` (site shell and feedback), `demo_gateway/` (Cloud Run quota gateway), and `.github/workflows/web-demo-pages.yml` (automatic web deployment from `main`). Read [WEB_DEMO.md](WEB_DEMO.md) before changing web configuration, quotas, or publishing. Web uses `DEMO_API_BASE_URL` without an API key; native builds retain `API_BASE_URL` and `API_KEY`.
+
 What the app is optimized for:
 
 - fast onboarding-to-tracking flow
@@ -129,7 +131,7 @@ Detailed behavior:
 
 - `PhotoFoodController.pickImage()` stores the last picked `XFile`.
 - `PhotoFoodController.analyzePickedImage()` sends the image to the backend.
-- The client always uses locale `ru-RU` right now.
+- The photo controller currently sends locale `en-US`.
 - If the backend marks the response as needing clarification, the UI can send one clarified request with:
   - `dish_category`
   - `ingredient_hints`
@@ -350,7 +352,7 @@ Use this as the fastest repo map.
 
 ### Runtime configuration
 
-The app reads API configuration from compile-time Dart defines:
+Native builds read API configuration from compile-time Dart defines:
 
 - `API_BASE_URL`
 - `API_KEY`
@@ -359,7 +361,7 @@ Source:
 
 - `lib/app_config.dart`
 
-If either value is missing, app initialization throws a `StateError`.
+Web builds use only `DEMO_API_BASE_URL`; their API key is empty. `AppConfig.tryFromEnvironment()` returns null for missing configuration, and the app supports manual local-only mode. The strict `AppConfig.fromEnvironment()` factory throws when explicitly called without configuration.
 
 ### Persistence
 
@@ -384,7 +386,7 @@ The frontend expects a separate backend exposing:
 
 It sends:
 
-- `X-API-Key`
+- `X-API-Key` on native clients; `X-Demo-Visitor` on web requests to the gateway
 - multipart `image`
 - `locale`
 - optional `meal_time`
@@ -472,7 +474,7 @@ Tradeoff:
 - Persistence is local-only and uses `SharedPreferences`, not a more structured data store.
 - There is no authentication, account sync, or remote user profile model in this repo.
 - Some profile surfaces are presentational rather than fully backed by real historical analytics.
-- Build/deploy flow is manual; no CI/CD is defined here.
+- GitHub Actions tests and publishes the web demo on pushes to `main`. The Cloud Run demo gateway requires a separate deployment; it is tested but not deployed by the Pages workflow.
 - There is no production analytics SDK yet, only debug-style event hooks in some areas.
 - There is no AI nutrition coach, Ask Coach, health integration, or activity-calorie import yet.
 

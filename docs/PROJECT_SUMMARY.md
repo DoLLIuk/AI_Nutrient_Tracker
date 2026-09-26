@@ -1,6 +1,14 @@
 # AI Nutrient Tracker — Project Summary
 
-Статус на 2026-07-16: Flutter-приложение с работающим core food-logging loop находится на этапе internal alpha перед закрытой Beta v1. Документ предназначен для быстрого handoff: его должно быть достаточно, чтобы понять продукт, текущую реализацию, принятые решения и следующий приоритет без чтения всей истории проекта.
+Обновление на 2026-09-26: опубликовано интерактивное веб-демо на GitHub Pages. Мобильное приложение остаётся на этапе internal alpha перед закрытой Beta v1; публикация демо не закрывает mobile release gates. Документ предназначен для быстрого handoff: его должно быть достаточно, чтобы понять продукт, текущую реализацию, принятые решения и следующий приоритет без чтения всей истории проекта.
+
+### Опубликованное веб-демо
+
+- [AI Nutrient Tracker](https://dolliuk.github.io/AI_Nutrient_Tracker/): реальный Flutter Web с sample profile, пятью фото-примерами, загрузкой своих фото и ручным логированием.
+- GitHub Actions автоматически публикует проверенный `main`; шлюз Cloud Run обновляется отдельно.
+- AI-запросы идут через `demo_gateway/`, ключ остаётся в Secret Manager. Firestore хранит дневные квоты и псевдонимные события; web-аналитика не использует Firebase Analytics Web.
+- Профиль и блюда остаются в браузере. Отзывы отправляются напрямую в Formspree; получение email владельцем ещё требует подтверждения.
+- Текущие лимиты, границы защиты и порядок обслуживания: [WEB_DEMO.md](WEB_DEMO.md).
 
 ## 1. Что это за продукт
 
@@ -47,10 +55,10 @@ AI Nutrient Tracker — mobile nutrition diary для iOS и Android. Польз
 | Область | Текущее решение |
 | --- | --- |
 | Client | Flutter / Dart, Material 3; основной orchestration/UI пока в `lib/main.dart`. |
-| AI photo backend | Отдельный backend, не входит в этот репозиторий. Клиент вызывает `POST /v0/ai/photo-food` и `POST /v0/ai/photo-food/confirm-portion` с `X-API-Key`. |
+| AI photo backend | Отдельный backend. Native client использует `X-API-Key`; web вызывает шлюз `demo_gateway/` без ключа в публичной сборке. |
 | Local data | `SharedPreferences`: onboarding result/draft и история блюд сохраняются на устройстве. Это не база данных и не cloud backup. |
 | Meal model | Локальные meal entries → session rebuild по дню → category/tier classification → Home/history. |
-| Analytics | Provider-neutral `Analytics` interface; Android/iOS используют Firebase Analytics, desktop — debug implementation. События не передают meal names, фото, body measurements, raw dates, request IDs или API keys. |
+| Analytics | Provider-neutral `Analytics` interface; Android/iOS — Firebase Analytics, web — ограниченный `WebDemoAnalytics` через Cloud Run/Firestore, native desktop — debug implementation. Web отправляет имя события и опциональный шаг onboarding; operational log шлюза отдельно хранит время и trace ID. |
 | Firebase config | Конфиги Android/iOS локальны и игнорируются Git. Их нельзя добавлять в публичную историю; release/CI должен получать их безопасным способом. |
 | Tests | Unit/widget tests покрывают onboarding, photo clarification/portion flows, API parsing, session logic, manual edit/autocalc, analytics и ключевые UI states. |
 

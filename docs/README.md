@@ -7,6 +7,7 @@ Use this map before changing product scope, architecture, AI behavior, or launch
 ## Canonical Docs
 
 - [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md): shareable project handoff — current capabilities, decisions, risks, and next priorities.
+- [WEB_DEMO.md](WEB_DEMO.md): live browser demo architecture, deployment, quotas, feedback, analytics, and operating instructions.
 - [PRODUCT_QUALITY_ROADMAP.md](PRODUCT_QUALITY_ROADMAP.md): master stage-by-stage quality roadmap from internal alpha through Public v1 and its first 30 days.
 - [agent_guide.md](agent_guide.md): engineering source of truth for future contributors and AI agents.
 - [MVP_PRD.md](MVP_PRD.md): current `Beta v1` product scope and success criteria.

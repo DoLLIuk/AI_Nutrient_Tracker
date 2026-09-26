@@ -63,9 +63,9 @@ a { color: inherit; }
   grid-template-columns: minmax(210px, 1fr) minmax(370px, 420px) minmax(255px, 320px);
   align-items: start;
   gap: clamp(28px, 3.5vw, 64px);
-  padding: 48px 0 42px;
+  padding: 24px 0 42px;
 }
-.intro { max-width: 460px; padding-top: 78px; }
+.intro { max-width: 460px; padding-top: 36px; }
 .eyebrow {
   margin: 0 0 21px;
   color: #49785d;
@@ -259,7 +259,7 @@ a { color: inherit; }
 }
 @media (max-width: 1040px) {
   .demo-layout { grid-template-columns: minmax(180px, 1fr) minmax(350px, 420px); justify-content: center; gap: 40px; }
-  .intro { padding-top: 78px; }
+  .intro { padding-top: 36px; }
   .feedback-panel {
     position: fixed;
     z-index: 30;
