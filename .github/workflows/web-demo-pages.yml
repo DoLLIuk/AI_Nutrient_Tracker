@@ -59,6 +59,9 @@ jobs:
           --base-href /AI_Nutrient_Tracker/
           --dart-define=DEMO_API_BASE_URL="$DEMO_API_BASE_URL"
 
+      - name: Version site shell assets
+        run: sed -i "s/__DEMO_ASSET_VERSION__/${GITHUB_SHA}/g" build/web/index.html
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 

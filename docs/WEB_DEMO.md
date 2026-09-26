@@ -60,6 +60,8 @@ No automatic event retention/cleanup policy was added. Browser IDs are pseudonym
 
 Push committed changes to `main`. The workflow runs Flutter tests, gateway tests, an HTTPS gateway URL check, and a release web build with base href `/AI_Nutrient_Tracker/`, then deploys `build/web`. A failed build does not replace the last successful site. Uncommitted local changes are not published.
 
+Before upload, the workflow substitutes the commit SHA into the CSS and site JavaScript URLs. Each published shell revision requests fresh assets instead of combining new HTML with cached old styles. Local preview uses the literal version placeholder, which is harmless to the local file server.
+
 Repository variables:
 
 - `WEB_DEMO_READY=true`: allows the build/deploy job to run.
