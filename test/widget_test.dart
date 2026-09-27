@@ -857,17 +857,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('You\'re past today\'s target'), findsOneWidget);
-    expect(find.text('Over'), findsOneWidget);
-    expect(find.text('200'), findsOneWidget);
-    expect(find.text('kcal over goal'), findsOneWidget);
-    expect(find.byKey(const Key('calorie-over-status-panel')), findsOneWidget);
+    expect(find.text('Keep the bigger picture in mind'), findsOneWidget);
+    expect(find.text('Over goal'), findsOneWidget);
+    expect(find.text('+200'), findsOneWidget);
+    expect(find.text('110% of goal'), findsOneWidget);
+    expect(find.text('Daily goal: 2000 kcal'), findsOneWidget);
     expect(find.byKey(const Key('calorie-overflow-segment')), findsOneWidget);
     expect(find.byKey(const Key('calorie-target-marker')), findsOneWidget);
-    expect(
-      find.text('If you eat again, keep it protein-first and light'),
-      findsOneWidget,
-    );
+    expect(find.text('One day is just part of your progress'), findsOneWidget);
   });
 
   testWidgets('coach card shows low calories left state', (tester) async {

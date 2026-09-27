@@ -78,10 +78,10 @@ class HomeCoachEvaluator {
     if (consumedKcal > calorieTarget) {
       return const CoachCardContent(
         state: CoachCardState.overTarget,
-        primary: 'You\'re past today\'s target',
-        secondary: 'If you eat again, keep it protein-first and light',
-        icon: Icons.flag_outlined,
-        accentColor: Color(0xFFDC2626),
+        primary: 'Keep the bigger picture in mind',
+        secondary: 'One day is just part of your progress',
+        icon: Icons.favorite_border_rounded,
+        accentColor: Color(0xFF64748B),
       );
     }
 
