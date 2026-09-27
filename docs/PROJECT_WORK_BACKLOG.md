@@ -1,5 +1,8 @@
 # Project Work Backlog
 
+Photo Flow decision (2026-09-27): [linked component entries and deferred crop/consumption rules](PHOTO_FLOW_FUTURE_COMPONENTS.md).
+Component splitting is planned for a future release after traction, not the current pilot.
+
 Status: working task list for making the project easier to build on.
 
 Last updated: 2026-07-16
@@ -20,6 +23,8 @@ It is intentionally practical. It is not a product pitch and not a detailed engi
 - Decide how feedback will be collected during beta.
 
 ## 2. Core Loop Quality
+
+- [ ] Deferred by owner (2026-09-26): optional composition correction (change meat type or exclude uneaten fries). Record only; do not implement before pilot review. Details: [PHOTO_FLOW_V2.md](PHOTO_FLOW_V2.md).
 
 - Make onboarding reliable and easy to finish.
 - Make the first meal log fast enough to feel valuable.

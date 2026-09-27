@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
@@ -244,7 +245,7 @@ void main() {
     final analytics = _RecordingAnalytics();
     final controller = PhotoFoodController(
       repository: _FakeRepository(requiresConfirmation: true),
-      photoPicker: _FakePicker(file: XFile('fake.jpg')),
+      photoPicker: _FakePicker(file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg')),
     );
 
     await tester.pumpWidget(
@@ -284,7 +285,7 @@ void main() {
     final analytics = _RecordingAnalytics();
     final controller = PhotoFoodController(
       repository: _FailingRepository(),
-      photoPicker: _FakePicker(file: XFile('fake.jpg')),
+      photoPicker: _FakePicker(file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg')),
     );
 
     await tester.pumpWidget(
@@ -325,7 +326,7 @@ void main() {
       );
       final controller = PhotoFoodController(
         repository: repository,
-        photoPicker: _FakePicker(file: XFile('fake.jpg')),
+        photoPicker: _FakePicker(file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg')),
       );
 
       await tester.pumpWidget(
@@ -382,7 +383,7 @@ void main() {
       final repository = _FakeRepository();
       final controller = PhotoFoodController(
         repository: repository,
-        photoPicker: _FakePicker(file: XFile('fake.jpg')),
+        photoPicker: _FakePicker(file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg')),
       );
 
       await tester.pumpWidget(
@@ -416,7 +417,7 @@ void main() {
     final repository = _FakeRepository();
     final controller = PhotoFoodController(
       repository: repository,
-      photoPicker: _FakePicker(file: XFile('fake.jpg')),
+      photoPicker: _FakePicker(file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg')),
     );
 
     await tester.pumpWidget(
@@ -443,7 +444,7 @@ void main() {
     final repository = _FakeRepository();
     final controller = PhotoFoodController(
       repository: repository,
-      photoPicker: _FakePicker(file: XFile('fake.jpg')),
+      photoPicker: _FakePicker(file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg')),
     );
 
     await tester.pumpWidget(
@@ -470,7 +471,7 @@ void main() {
   ) async {
     final controller = PhotoFoodController(
       repository: _FakeRepository(requiresConfirmation: true),
-      photoPicker: _FakePicker(file: XFile('fake.jpg')),
+      photoPicker: _FakePicker(file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg')),
     );
 
     await tester.pumpWidget(
@@ -2946,6 +2947,7 @@ class _FakeRepository implements PhotoFoodRepository {
     String locale = 'en-US',
     String? mealTime,
     PhotoClarificationInput? clarification,
+    String? operationId,
   }) async {
     analyzeCallCount += 1;
     lastLocale = locale;
@@ -3037,6 +3039,7 @@ class _FailingRepository extends _FakeRepository {
     String locale = 'en-US',
     String? mealTime,
     PhotoClarificationInput? clarification,
+    String? operationId,
   }) async {
     throw const ApiException(
       ApiError(code: 'NETWORK_ERROR', message: 'Network error'),

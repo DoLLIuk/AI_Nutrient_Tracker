@@ -9,6 +9,7 @@ abstract class PhotoFoodRepository {
     String locale,
     String? mealTime,
     PhotoClarificationInput? clarification,
+    String? operationId,
   });
 
   Future<PhotoFoodResponse> confirmPortion({
@@ -38,6 +39,7 @@ class UnavailablePhotoFoodRepository implements PhotoFoodRepository {
     String locale = 'en-US',
     String? mealTime,
     PhotoClarificationInput? clarification,
+    String? operationId,
   }) {
     return Future<PhotoFoodResponse>.error(_unavailable);
   }

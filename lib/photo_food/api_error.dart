@@ -46,6 +46,22 @@ class ApiError {
 
 String mapErrorCodeToMessage(String code) {
   switch (code) {
+    case 'PHOTO_PICK_FAILED':
+      return 'Could not recover or open the photo. Check camera/photos access, then discard this draft and choose again.';
+    case 'SCAN_STORAGE_FAILED':
+      return 'Could not save the scan on this device. Free some storage and try again.';
+    case 'SCAN_PENDING':
+      return 'A saved scan needs attention. Check it or discard it before taking another photo.';
+    case 'RECOVERY_NOT_SUPPORTED':
+      return 'Photo scanning needs a service update. You can add your meal manually.';
+    case 'OPERATION_PENDING':
+      return 'Your scan is still processing. Check again shortly.';
+    case 'OPERATION_UNCERTAIN':
+      return 'This scan was interrupted. Check once more or discard it and start a new scan.';
+    case 'OPERATION_STORE_UNAVAILABLE':
+      return 'Your photo is saved on this device. Please check the scan again later.';
+    case 'OPERATION_CONFLICT':
+      return 'This saved scan could not be matched. Discard it before starting a new scan.';
     case 'UNAUTHORIZED':
       return 'Invalid API key.';
     case 'NO_FOOD_DETECTED':

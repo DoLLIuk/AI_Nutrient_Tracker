@@ -39,12 +39,43 @@ class PhotoFoodApiClient implements PhotoFoodRepository {
     String locale = 'en-US',
     String? mealTime,
     PhotoClarificationInput? clarification,
+    String? operationId,
   }) async {
+    try {
+      if (operationId != null) {
+        // Old deployments ignore Idempotency-Key. Never retry a paid upload there.
+        final capabilities = await _httpClient
+            .get(_resolveUri('/v0/health'))
+            .timeout(_requestTimeout);
+        final data = jsonDecode(capabilities.body);
+        if (capabilities.statusCode != 200 ||
+            data is! Map ||
+            data['photo_flow_version'] != 2 ||
+            data['durable_operations'] != true) {
+          throw const ApiException(
+            ApiError(
+              code: 'RECOVERY_NOT_SUPPORTED',
+              message: 'The analysis service needs an update.',
+            ),
+          );
+        }
+      }
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw const ApiException(
+        ApiError(
+          code: 'CONNECTION_ERROR',
+          message: 'Could not verify scan recovery support',
+        ),
+      );
+    }
     final uri = _resolveUri('/v0/ai/photo-food');
     final clientTraceId = _newClientTraceId();
     final request = http.MultipartRequest('POST', uri)
       ..headers.addAll(await _requestHeaders(clientTraceId))
       ..fields['locale'] = locale;
+    if (operationId != null) request.headers['Idempotency-Key'] = operationId;
 
     if (mealTime != null && mealTime.trim().isNotEmpty) {
       request.fields['meal_time'] = mealTime.trim();

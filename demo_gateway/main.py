@@ -41,8 +41,8 @@ app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_methods=["POST"],
-    allow_headers=["Content-Type", "X-Demo-Visitor", "X-Client-Trace-ID", "X-Client-Diagnostics"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-Demo-Visitor", "X-Client-Trace-ID", "X-Client-Diagnostics", "Idempotency-Key"],
 )
 
 
@@ -172,12 +172,13 @@ async def record_event(request: Request):
     return {"ok": True}
 
 
-async def forward(url: str, api_key: str, trace_id: str, *, data=None, files=None, payload=None):
+async def forward(url: str, api_key: str, trace_id: str, *, data=None, files=None, payload=None, operation_key=None):
     try:
         async with httpx.AsyncClient(timeout=35) as client:
             response = await client.post(
                 url,
-                headers={"X-API-Key": api_key, "X-Client-Trace-ID": trace_id},
+                headers={"X-API-Key": api_key, "X-Client-Trace-ID": trace_id,
+                         **({"Idempotency-Key": operation_key} if operation_key else {})},
                 data=data,
                 files=files,
                 json=payload,
@@ -189,6 +190,8 @@ async def forward(url: str, api_key: str, trace_id: str, *, data=None, files=Non
         headers = {}
         if response.headers.get("X-Request-ID"):
             headers["X-Request-ID"] = response.headers["X-Request-ID"]
+        if response.headers.get("Retry-After"):
+            headers["Retry-After"] = response.headers["Retry-After"]
         return JSONResponse(status_code=response.status_code, content=body, headers=headers)
     except (httpx.HTTPError, ValueError):
         logging.exception("Upstream analysis failed")
@@ -198,6 +201,24 @@ async def forward(url: str, api_key: str, trace_id: str, *, data=None, files=Non
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+@app.get("/v0/health")
+async def photo_capabilities(request: Request):
+    if not origin_allowed(request):
+        return error(403, "FORBIDDEN", "This demo origin is not allowed")
+    try:
+        upstream, _, _ = settings()
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(f"{upstream}/v0/health")
+        body = response.json()
+        supported = (response.status_code == 200 and isinstance(body, dict)
+                     and body.get("photo_flow_version") == 2
+                     and body.get("durable_operations") is True)
+        return {"ok": True, "photo_flow_version": 2 if supported else 1,
+                "durable_operations": supported}
+    except (RuntimeError, httpx.HTTPError, ValueError):
+        return error(503, "DEMO_UNAVAILABLE", "The demo is temporarily unavailable")
 
 
 @app.post("/v0/ai/photo-food")
@@ -217,6 +238,9 @@ async def analyze(
         return error(413, "IMAGE_TOO_LARGE", "Image must be 1 byte to 8 MB")
     if analysis_mode not in {"initial", "clarified"}:
         return error(400, "VALIDATION_ERROR", "Invalid analysis mode")
+    operation_key = request.headers.get("Idempotency-Key")
+    if operation_key is not None and not re.fullmatch(r"[A-Za-z0-9_-]{16,128}", operation_key):
+        return error(400, "INVALID_OPERATION_KEY", "Invalid scan key")
     upstream_info, rejection = await admission(request, "analysis")
     if rejection is not None:
         return rejection
@@ -231,6 +255,7 @@ async def analyze(
     return await forward(
         f"{upstream}/v0/ai/photo-food", api_key, trace_id,
         data=fields, files={"image": (image.filename or "meal.jpg", content, image.content_type)},
+        operation_key=operation_key,
     )
 
 

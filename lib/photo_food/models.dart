@@ -189,6 +189,48 @@ class PhotoFoodResponse {
     required this.meta,
   });
 
+  Map<String, dynamic> toJson() => {
+    'request_id': requestId,
+    'item': {
+      'name': item.name,
+      'category': item.category,
+      'food_type': item.foodType,
+      'confidence': item.confidence,
+      'warnings': item.warnings,
+      'nutrition_per_100g': {
+        'kcal': item.nutritionPer100g.kcal,
+        'protein_g': item.nutritionPer100g.proteinG,
+        'fat_g': item.nutritionPer100g.fatG,
+        'carbs_g': item.nutritionPer100g.carbsG,
+      },
+    },
+    'ui_flags': {
+      'requires_user_confirmation': uiFlags.requiresUserConfirmation,
+      'highlight_level': uiFlags.highlightLevel,
+      'clarification_available': uiFlags.clarificationAvailable,
+      'should_prompt_clarification': uiFlags.shouldPromptClarification,
+    },
+    'meta': {
+      'needs_confirmation': meta.needsConfirmation,
+      'estimated_portion_g': meta.estimatedPortionG,
+      'portion_basis': meta.portionBasis,
+      'confirmation_source': meta.confirmationSource,
+      'totals_are_estimate': meta.totalsAreEstimate,
+      'ambiguity_reason': meta.ambiguityReason,
+      'clarification_categories': meta.clarificationCategories
+          .map((e) => e.apiValue)
+          .toList(),
+      'estimated_totals': meta.estimatedTotals == null
+          ? null
+          : {
+              'kcal': meta.estimatedTotals!.kcal,
+              'protein_g': meta.estimatedTotals!.proteinG,
+              'fat_g': meta.estimatedTotals!.fatG,
+              'carbs_g': meta.estimatedTotals!.carbsG,
+            },
+    },
+  };
+
   factory PhotoFoodResponse.fromJson(Map<String, dynamic> json) {
     return PhotoFoodResponse(
       requestId: json['request_id'] as String,

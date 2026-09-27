@@ -20,6 +20,7 @@ import 'photo_food/controller.dart';
 import 'photo_food/models.dart';
 import 'photo_food/photo_picker.dart';
 import 'photo_food/repository.dart';
+import 'photo_food/operation_store.dart';
 import 'profile/profile_page.dart';
 import 'web_demo_analytics.dart';
 
@@ -80,6 +81,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   static const _onboardingResultKey = 'app.onboarding.result';
   static const _onboardingDraftKey = 'app.onboarding.draft';
   static const _mealsKey = 'app.meals';
+  static const _deletedMealIdsKey = 'app.meals.deleted_ids';
   static const _debugMealDetailsKey = 'app.debug.meal_details';
 
   late final PhotoFoodController _controller;
@@ -117,6 +119,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       _controller = PhotoFoodController(
         repository: repository,
         photoPicker: picker,
+        operationStore: DurablePhotoOperationStore(),
       );
       _ownsController = true;
       _photoAnalysisAvailable = widget.repository != null || config != null;
@@ -146,7 +149,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       final restoredResult =
           widget.onboardingResult ?? _decodeOnboardingResult(resultRaw);
       final restoredDraft = _decodeOnboardingDraft(draftRaw);
-      final restoredMeals = _decodeMeals(mealsRaw);
+      _controller.deletedRequestIds.addAll(prefs.getStringList(_deletedMealIdsKey) ?? const []);
+      final restoredMeals = _decodeMeals(mealsRaw)
+          .where((m) => !_controller.deletedRequestIds.contains(m.requestId)).toList();
 
       setState(() {
         _onboardingResult = restoredResult;
@@ -191,10 +196,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       );
     }
 
-    await prefs.setString(
+    final savedMeals = List<_MealEntry>.from(_persistedMeals);
+    final receipt = _controller.pendingReceipt;
+    // Persist deletion markers before the diary/acknowledgement. A crash between
+    // these writes must not revive a removed scan from its old journal response.
+    final savedDeletions = _controller.deletedRequestIds.toList();
+    if (!await prefs.setStringList(_deletedMealIdsKey, savedDeletions)) return;
+    final saved = await prefs.setString(
       _mealsKey,
-      jsonEncode(_persistedMeals.map((m) => m.toJson()).toList()),
+      jsonEncode(savedMeals.map((m) => m.toJson()).toList()),
     );
+    if (saved) {
+      await _controller.acknowledgeSaved({...savedMeals.map((m) => m.requestId), ...savedDeletions}, receipt);
+    }
     await prefs.setBool(_debugMealDetailsKey, _showDebugMealDetails);
   }
 
@@ -302,6 +316,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void _handleMealsChanged(List<_MealEntry> meals) {
     final previousMeals = _persistedMeals;
     final previousIds = previousMeals.map((meal) => meal.requestId).toSet();
+    final currentIds = meals.map((meal) => meal.requestId).toSet();
+    _controller.deletedRequestIds.addAll(previousIds.difference(currentIds));
     final addedMeals =
         meals.where((meal) => !previousIds.contains(meal.requestId)).toList()
           ..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
@@ -624,6 +640,9 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     meals.addAll(widget.initialMeals);
     _rebuildAllSessions();
     widget.controller.addListener(_onControllerUpdated);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.controller.restorePending();
+    });
   }
 
   void _notifyMealsChanged() {
@@ -753,12 +772,37 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
   }
 
   void _upsertMealFromResponse(PhotoFoodResponse response) {
+    if (widget.controller.deletedRequestIds.contains(response.requestId)) {
+      _notifyMealsChanged();
+      return;
+    }
     final totals = response.meta.estimatedTotals;
-    final now = _now;
+    final existingIndex = meals.indexWhere((m) => m.requestId == response.requestId);
+    if (existingIndex >= 0) {
+      final existing = meals[existingIndex];
+      // Replayed analysis must not overwrite a user's edits, category or date.
+      final expectedRevision = widget.controller.resultBaseRevision;
+      if (response.meta.confirmationSource != null &&
+          (expectedRevision == null ? !existing.portionReviewed : existing.revision == expectedRevision)) {
+        setState(() {
+          meals[existingIndex] = existing.copyWith(
+            kcal: totals?.kcal, proteinG: totals?.proteinG,
+            fatG: totals?.fatG, carbsG: totals?.carbsG,
+            portionG: response.meta.estimatedPortionG, portionReviewed: true,
+            revision: existing.revision + 1,
+          );
+          _rebuildSessionsForDay(existing.day, notify: false);
+        });
+      }
+      _notifyMealsChanged();
+      return;
+    }
+    final now = widget.controller.scanCapturedAt ?? _now;
+    final diaryDate = widget.controller.scanDate ?? _selectedDate;
     final entryTimestamp = DateTime(
-      _selectedDate.year,
-      _selectedDate.month,
-      _selectedDate.day,
+      diaryDate.year,
+      diaryDate.month,
+      diaryDate.day,
       now.hour,
       now.minute,
       now.second,
@@ -769,7 +813,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       requestId: response.requestId,
       origin: MealOrigin.ai,
       name: response.item.name,
-      day: _selectedDate,
+      day: diaryDate,
       timestamp: entryTimestamp,
       loggedAt: now,
       historyMode: MealHistoryMode.timed,
@@ -780,6 +824,8 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       fatG: totals?.fatG ?? 0,
       portionG: response.meta.estimatedPortionG,
       confidence: response.item.confidence,
+      portionReviewed: response.meta.confirmationSource != null,
+      revision: response.meta.confirmationSource == null ? 0 : (widget.controller.resultBaseRevision ?? 0) + 1,
       per100Kcal: response.item.nutritionPer100g.kcal,
       per100ProteinG: response.item.nutritionPer100g.proteinG,
       per100CarbsG: response.item.nutritionPer100g.carbsG,
@@ -799,12 +845,18 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       } else {
         meals.insert(0, meal);
       }
-      _rebuildSessionsForDay(_selectedDate, notify: false);
+      _rebuildSessionsForDay(diaryDate, notify: false);
     });
     _notifyMealsChanged();
   }
 
   Future<void> _onPlusTap() async {
+    if (widget.controller.hasDraft) {
+      await _resumePhotoDraft();
+      return;
+    }
+    final scanDate = _selectedDate;
+    final capturedAt = _now;
     final action = await _showAddActionSheet();
     if (action == null) return;
 
@@ -821,14 +873,14 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
         ? PickSource.camera
         : PickSource.gallery;
     final pickedFile = samplePath == null
-        ? await widget.controller.pickImage(source)
-        : await widget.controller.pickSampleImage(samplePath);
+        ? await widget.controller.pickImage(source, diaryDate: scanDate, capturedAt: capturedAt)
+        : await widget.controller.pickSampleImage(samplePath, diaryDate: scanDate, capturedAt: capturedAt);
     if (!mounted || pickedFile == null) return;
 
     final clarification = await _showClarificationBottomSheet();
     if (!mounted) return;
 
-    await widget.controller.analyzePickedImage(clarification: clarification);
+    await widget.controller.analyzePickedImage(clarification: clarification, diaryDate: scanDate, capturedAt: capturedAt);
     if (!mounted) return;
     final photoState = widget.controller.state;
     final sourceName = samplePath == null ? source.name : 'sample';
@@ -864,6 +916,14 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     }
   }
 
+  Future<void> _resumePhotoDraft() async {
+    if (!widget.controller.hasDraft) return;
+    final clarification = await _showClarificationBottomSheet();
+    if (!mounted) return;
+    await widget.controller.analyzePickedImage(clarification: clarification);
+    if (mounted) await _handlePhotoFlowContinuation();
+  }
+
   Future<_AddAction?> _showAddActionSheet() {
     return showModalBottomSheet<_AddAction>(
       context: context,
@@ -874,6 +934,8 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.photoAnalysisAvailable) ...[
+                const Padding(padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Text('Photograph one whole plate, including sides. Add drinks and separate dishes separately.')),
                 if (!kIsWeb)
                   ListTile(
                     key: const Key('pick-camera'),
@@ -974,6 +1036,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
   }
 
   Future<void> _showManualMealSheet({_MealEntry? editingMeal}) async {
+    var portionReviewed = editingMeal?.portionReviewed ?? true;
     final nameCtrl = TextEditingController(text: editingMeal?.name ?? '');
     final kcalCtrl = TextEditingController(
       text: editingMeal == null ? '' : editingMeal.kcal.toStringAsFixed(1),
@@ -1213,6 +1276,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
         return;
       }
 
+      if (field == _MealEditField.weight && parsedValue > 0) portionReviewed = true;
       if (editingMeal == null && isMacroField(field)) {
         manuallyEnteredMacroFields.add(field);
       }
@@ -1295,12 +1359,14 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     }
 
     bool hasSessionRestoreChanges() {
-      return !formDraft.isSameSessionState(initialFormDraft) ||
+      return portionReviewed != (editingMeal?.portionReviewed ?? true) ||
+          !formDraft.isSameSessionState(initialFormDraft) ||
           selectedMealType != initialMealType ||
           nameCtrl.text != initialMealName;
     }
 
     void restoreSessionStart(StateSetter setSheetState) {
+      portionReviewed = editingMeal?.portionReviewed ?? true;
       formDraft = initialFormDraft;
       selectedMealType = initialMealType;
       updateControllerText(nameCtrl, initialMealName);
@@ -1400,6 +1466,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       StateSetter setSheetState,
     ) {
       final meal = _buildManualMeal(
+        portionReviewed: portionReviewed,
         original: editingMeal,
         name: nameCtrl.text,
         draft: draftToSave,
@@ -1553,6 +1620,14 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                       controller: gramsCtrl,
                                       fieldKeySuffix: 'weight',
                                       label: 'Weight',
+                                      inputTrailing: editingMeal?.origin == MealOrigin.ai && !portionReviewed
+                                          ? IconButton(
+                                              key: const Key('portion-mark-reviewed'),
+                                              tooltip: 'Total food weight, including sides. Mark as checked.',
+                                              visualDensity: VisualDensity.compact,
+                                              icon: const Icon(Icons.fact_check_outlined, size: 20, color: Color(0xFF64748B)),
+                                              onPressed: () => setSheetState(() => portionReviewed = true),
+                                            ) : null,
                                       hint: numericHint(
                                         _MealEditField.weight,
                                         editingMeal?.portionG,
@@ -2122,6 +2197,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     bool readOnly = false,
     bool isLocked = false,
     Widget? labelTrailing,
+    Widget? inputTrailing,
     VoidCallback? onDoubleTapLock,
     VoidCallback? onUnlock,
     VoidCallback? onTap,
@@ -2180,6 +2256,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                       decoration: InputDecoration(
                         hintText: hint,
                         suffixText: suffixText,
+                        suffixIcon: inputTrailing,
                         suffixStyle: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -2303,6 +2380,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
   }
 
   _MealEntry? _buildManualMeal({
+    required bool portionReviewed,
     required _MealEntry? original,
     required String name,
     required _MealFormDraft draft,
@@ -2341,6 +2419,8 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
         fatG: draft.fatG,
         portionG: draft.grams,
         confidence: original.confidence,
+        portionReviewed: portionReviewed,
+        revision: original.revision + 1,
         per100Kcal: draft.kcal * per100Factor,
         per100ProteinG: draft.proteinG * per100Factor,
         per100CarbsG: draft.carbsG * per100Factor,
@@ -2387,6 +2467,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       fatG: draft.fatG,
       portionG: draft.grams,
       confidence: 1.0,
+      portionReviewed: true,
       per100Kcal: draft.kcal * factor,
       per100ProteinG: draft.proteinG * factor,
       per100CarbsG: draft.carbsG * factor,
@@ -2423,6 +2504,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
   Future<void> _showPortionBottomSheet() async {
     final response = widget.controller.state.response;
     if (response == null) return;
+    final baseRevision = _mealById(response.requestId)?.revision ?? 0;
 
     final aiEstimate = response.meta.estimatedPortionG;
     final inputController = TextEditingController(
@@ -2454,7 +2536,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                   HomeStatus.confirmingPortion;
               return Material(
                 color: Colors.transparent,
-                child: Column(
+                child: SingleChildScrollView(child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -2467,7 +2549,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Enter grams (1-2000) for accurate calories and macros.',
+                      'Total weight of all food, including sides, without the plate. Enter it if known to refine the estimate.',
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -2488,7 +2570,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                         decimal: true,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'Grams',
+                        labelText: 'Total food weight (g)',
                         errorText: localError,
                         border: const OutlineInputBorder(),
                       ),
@@ -2516,7 +2598,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                   ),
                                 );
                                 final ok = await widget.controller
-                                    .confirmPortion(grams);
+                                    .confirmPortion(grams, baseRevision: baseRevision);
                                 if (!context.mounted) return;
                                 if (ok) Navigator.of(context).pop();
                               },
@@ -2540,7 +2622,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                             ? null
                             : () async {
                                 final ok = await widget.controller
-                                    .confirmPortionWithAiEstimate();
+                                    .confirmPortionWithAiEstimate(baseRevision: baseRevision);
                                 if (!context.mounted) return;
                                 if (ok) Navigator.of(context).pop();
                               },
@@ -2548,7 +2630,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                       ),
                     ),
                   ],
-                ),
+                )),
               );
             },
           ),
@@ -2786,7 +2868,13 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                 if (!meal.isCategoryOnly)
                   Text('Time: ${_timeLabelFromDateTime(meal.consumedAt)}'),
                 const SizedBox(height: 12),
-                Text('Portion: ${meal.portionG?.toStringAsFixed(0) ?? '-'} g'),
+                Row(children: [
+                  Text('Portion: ${meal.portionG?.toStringAsFixed(0) ?? '-'} g'),
+                  if (meal.origin == MealOrigin.ai && !meal.portionReviewed)
+                    const Padding(padding: EdgeInsets.only(left: 6), child: Tooltip(
+                      message: 'Portion not yet checked',
+                      child: Icon(Icons.fact_check_outlined, size: 18, color: Color(0xFF64748B)))),
+                ]),
                 Text('Calories: ${meal.kcal.toStringAsFixed(1)} kcal'),
                 Text('Protein: ${meal.proteinG.toStringAsFixed(1)} g'),
                 Text('Fat: ${meal.fatG.toStringAsFixed(1)} g'),
@@ -3012,6 +3100,26 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                       _buildPhotoErrorCard(state.error!),
                       const SizedBox(height: 14),
                     ],
+                    if (state.status == HomeStatus.draftReady) ...[
+                      Container(width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: const Color(0xFFE2E6EF))),
+                        child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [const Text('Your photo is ready', style: TextStyle(fontWeight: FontWeight.w600)),
+                          const Text('Continue when you are ready to log it.'),
+                          Wrap(spacing: 8, children: [
+                            FilledButton(key: const Key('photo-draft-continue'), onPressed: _resumePhotoDraft,
+                              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2B66F6)),
+                              child: const Text('Continue')),
+                            TextButton(key: const Key('photo-draft-discard'), onPressed: widget.controller.discardPending,
+                              child: const Text('Discard')),
+                          ]),
+                        ],
+                      )),
+                      const SizedBox(height: 14),
+                    ],
                     _buildCaloriesCard(
                       consumed: consumed,
                       target: calorieTarget,
@@ -3076,12 +3184,8 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
               ),
             ),
             if (isLoading)
-              Positioned.fill(
-                child: ColoredBox(
-                  color: const Color(0x66000000),
-                  child: const Center(child: CircularProgressIndicator()),
-                ),
-              ),
+              const Positioned(top: 0, left: 0, right: 0,
+                child: IgnorePointer(child: LinearProgressIndicator(key: Key('photo-background-progress'), minHeight: 2))),
           ],
         );
       },
@@ -3327,8 +3431,23 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                     await widget.controller.retryLastAnalysis();
                   },
                   icon: const Icon(Icons.refresh_rounded, size: 18),
-                  label: const Text('Try again'),
+                  label: Text(widget.controller.hasPendingScan ? 'Check scan' : 'Try again'),
                 ),
+                if (widget.controller.hasPendingScan)
+                  TextButton(
+                    key: const Key('photo-error-discard'),
+                    onPressed: () async {
+                      final discard = await showDialog<bool>(context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Discard saved scan?'),
+                          content: const Text('The unfinished scan will be removed from this device.'),
+                          actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep')),
+                            TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard'))],
+                        ));
+                      if (discard == true) await widget.controller.discardPending();
+                    },
+                    child: const Text('Discard scan'),
+                  ),
                 OutlinedButton(
                   key: const Key('photo-error-add-manually'),
                   onPressed: () async {
@@ -3498,6 +3617,8 @@ class _MealEntry {
   final double fatG;
   final double? portionG;
   final double confidence;
+  final bool portionReviewed;
+  final int revision;
   final double per100Kcal;
   final double per100ProteinG;
   final double per100CarbsG;
@@ -3524,6 +3645,8 @@ class _MealEntry {
     required this.fatG,
     required this.portionG,
     required this.confidence,
+    this.portionReviewed = false,
+    this.revision = 0,
     required this.per100Kcal,
     required this.per100ProteinG,
     required this.per100CarbsG,
@@ -3562,6 +3685,8 @@ class _MealEntry {
     double? portionG,
     bool clearPortionG = false,
     double? confidence,
+    bool? portionReviewed,
+    int? revision,
     double? per100Kcal,
     double? per100ProteinG,
     double? per100CarbsG,
@@ -3591,6 +3716,8 @@ class _MealEntry {
       fatG: fatG ?? this.fatG,
       portionG: clearPortionG ? null : (portionG ?? this.portionG),
       confidence: confidence ?? this.confidence,
+      portionReviewed: portionReviewed ?? this.portionReviewed,
+      revision: revision ?? this.revision,
       per100Kcal: per100Kcal ?? this.per100Kcal,
       per100ProteinG: per100ProteinG ?? this.per100ProteinG,
       per100CarbsG: per100CarbsG ?? this.per100CarbsG,
@@ -3622,6 +3749,8 @@ class _MealEntry {
     'fatG': fatG,
     'portionG': portionG,
     'confidence': confidence,
+    'portionReviewed': portionReviewed,
+    'revision': revision,
     'per100Kcal': per100Kcal,
     'per100ProteinG': per100ProteinG,
     'per100CarbsG': per100CarbsG,
@@ -3707,6 +3836,8 @@ class _MealEntry {
       fatG: (json['fatG'] as num?)?.toDouble() ?? 0,
       portionG: (json['portionG'] as num?)?.toDouble(),
       confidence: (json['confidence'] as num?)?.toDouble() ?? 0,
+      portionReviewed: json['portionReviewed'] as bool? ?? origin == MealOrigin.manual,
+      revision: json['revision'] as int? ?? 0,
       per100Kcal: (json['per100Kcal'] as num?)?.toDouble() ?? 0,
       per100ProteinG: (json['per100ProteinG'] as num?)?.toDouble() ?? 0,
       per100CarbsG: (json['per100CarbsG'] as num?)?.toDouble() ?? 0,

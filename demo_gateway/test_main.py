@@ -47,18 +47,41 @@ def test_valid_analysis_forwards_only_server_key(monkeypatch):
 
     async def fake_forward(url, api_key, trace_id, **kwargs):
         forwarded.update(url=url, api_key=api_key, fields=kwargs["data"], files=kwargs["files"])
+        forwarded["key"] = kwargs.get("operation_key")
         return main.JSONResponse({"request_id": "sample"})
 
     monkeypatch.setattr(main, "forward", fake_forward)
     response = client.post(
         "/v0/ai/photo-food",
-        headers=HEADERS,
+        headers={**HEADERS, "Idempotency-Key": "saved_scan_1234567890"},
         data={"locale": "en-US", "analysis_mode": "initial"},
         files={"image": ("food.jpg", b"abc", "image/jpeg")},
     )
     assert response.status_code == 200
     assert forwarded["api_key"] == "private-test-key"
     assert forwarded["files"]["image"][1] == b"abc"
+    assert forwarded["key"] == "saved_scan_1234567890"
+
+
+def test_recovery_preflight_allows_stable_key():
+    response = client.options("/v0/ai/photo-food", headers={
+        "Origin": HEADERS["Origin"], "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "idempotency-key,x-demo-visitor",
+    })
+    assert response.status_code == 200
+
+
+def test_capability_proxy_does_not_claim_support_from_old_backend(monkeypatch):
+    class UpstreamClient:
+        def __init__(self, **kwargs): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        async def get(self, url):
+            return main.httpx.Response(200, json={"ok": True})
+    monkeypatch.setattr(main.httpx, "AsyncClient", UpstreamClient)
+    response = client.get("/v0/health", headers=HEADERS)
+    assert response.status_code == 200
+    assert response.json()["durable_operations"] is False
 
 
 def test_invalid_confirmation_does_not_consume_quota(monkeypatch):
