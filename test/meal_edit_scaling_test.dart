@@ -76,6 +76,26 @@ void expectPortion(WidgetTester tester, double grams) {
 }
 
 void main() {
+  testWidgets('unlocking weight preserves locked-calorie save confirmation', (
+    tester,
+  ) async {
+    await openBurger(tester);
+    await edit(tester, 'weight', '250');
+    await edit(tester, 'calories', '700');
+    await edit(tester, 'protein', '100');
+    await tester.ensureVisible(find.byKey(const Key('meal-lock-weight')));
+    await tester.tap(find.byKey(const Key('meal-lock-weight')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Save Changes'));
+    await tester.tap(find.text('Save Changes'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('locked-calories-auto-save')), findsOneWidget);
+    expect(
+      find.byKey(const Key('locked-calories-save-as-entered')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('typing weight through zero cannot inflate nutrition', (
     tester,
   ) async {

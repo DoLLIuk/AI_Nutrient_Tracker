@@ -239,7 +239,8 @@ class _MealFormDraft {
       clearLastEditedField: lastEditedField == field,
     );
     if (field == _MealEditField.weight) {
-      return next._validateExistingConsistency();
+      // Unlocking weight must not dismiss a pending locked-calorie conflict.
+      return next.copyWith(errorMessage: errorMessage);
     }
     if (!next.isLocked(_MealEditField.calories)) {
       return next._syncCaloriesToMacros();

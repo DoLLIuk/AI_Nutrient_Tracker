@@ -2241,7 +2241,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
               label,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
-            if (labelAccessory != null) labelAccessory,
+            ?labelAccessory,
             if (labelTrailing != null) ...[const Spacer(), labelTrailing],
           ],
         )),
