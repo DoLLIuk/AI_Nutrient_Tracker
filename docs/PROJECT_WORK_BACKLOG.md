@@ -24,6 +24,7 @@ It is intentionally practical. It is not a product pitch and not a detailed engi
 
 ## 2. Core Loop Quality
 
+- [ ] Deferred by owner (2026-09-27): redesign the weight-review affordance. The current `≈` beside Weight is too ambiguous: users do not understand what it means or that it is clickable. Revisit the explanation and discoverability while preserving unit/field alignment. Leave the current implementation in place; do not redesign it during the model-evaluation pilot.
 - [ ] Deferred by owner (2026-09-26): optional composition correction (change meat type or exclude uneaten fries). Record only; do not implement before pilot review. Details: [PHOTO_FLOW_V2.md](PHOTO_FLOW_V2.md).
 
 - Make onboarding reliable and easy to finish.

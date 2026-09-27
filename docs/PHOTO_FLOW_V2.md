@@ -29,6 +29,14 @@ specific names where supported; generalize only uncertain ingredients.
   an error does not erase the saved scan. Force-closing does not guarantee
   continued mobile execution: recovery runs when the app is opened again.
 
+## Deferred UI follow-up (2026-09-27)
+
+Owner feedback: the `≈` weight-review mark is unclear, and its appearance does
+not communicate that it can be tapped. The tooltip alone is insufficient for
+discoverability on mobile. Keep the current behavior for now and revisit the
+meaning/action presentation after the model-evaluation pilot; preserve the
+alignment of units and paired inputs. No further UI changes requested now.
+
 ## Backend rollout dependency
 
 Do not release the new client against the old backend. `/v0/health` must expose
