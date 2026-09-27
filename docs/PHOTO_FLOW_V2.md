@@ -17,9 +17,12 @@ specific names where supported; generalize only uncertain ingredients.
   journal as soon as the result is saved. Remove the journal only after the
   diary persistence acknowledges it. Replays preserve existing user edits.
 - A checked weight is distinct from model recognition confidence. The small
-  check icon beside Weight lets the user mark it checked; changing weight also
+  approximation mark (`≈`) beside the Weight label lets the user mark it checked;
+  its tooltip explains the action, and changing weight also
   checks it when saved. Saving a rename alone does not. Legacy AI entries are
   conservatively unreviewed; manual entries are reviewed.
+  Keep this action outside the numeric input so `g` stays aligned with other
+  units. Numeric-field headers share a minimum height to keep paired inputs aligned.
 - Weight means all edible food including sides, excluding plate/container.
 - Successful results are logged even when the portion sheet is dismissed.
 - Unfinished scans can be checked again or explicitly discarded. Dismissing

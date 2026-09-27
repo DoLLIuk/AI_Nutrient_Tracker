@@ -1620,13 +1620,21 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                       controller: gramsCtrl,
                                       fieldKeySuffix: 'weight',
                                       label: 'Weight',
-                                      inputTrailing: editingMeal?.origin == MealOrigin.ai && !portionReviewed
-                                          ? IconButton(
+                                      labelAccessory: editingMeal?.origin == MealOrigin.ai && !portionReviewed
+                                          ? TextButton(
                                               key: const Key('portion-mark-reviewed'),
-                                              tooltip: 'Total food weight, including sides. Mark as checked.',
-                                              visualDensity: VisualDensity.compact,
-                                              icon: const Icon(Icons.fact_check_outlined, size: 20, color: Color(0xFF64748B)),
+                                              style: TextButton.styleFrom(
+                                                foregroundColor: const Color(0xFF64748B),
+                                                minimumSize: const Size(44, 32),
+                                                padding: EdgeInsets.zero,
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
                                               onPressed: () => setSheetState(() => portionReviewed = true),
+                                              child: const Tooltip(
+                                                message: 'Estimated weight. Mark as checked. To correct it, edit the number.',
+                                                child: Text('≈', semanticsLabel: 'Estimated weight. Mark as checked',
+                                                  style: TextStyle(fontSize: 20, height: 1)),
+                                              ),
                                             ) : null,
                                       hint: numericHint(
                                         _MealEditField.weight,
@@ -2197,7 +2205,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     bool readOnly = false,
     bool isLocked = false,
     Widget? labelTrailing,
-    Widget? inputTrailing,
+    Widget? labelAccessory,
     VoidCallback? onDoubleTapLock,
     VoidCallback? onUnlock,
     VoidCallback? onTap,
@@ -2210,15 +2218,16 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        ConstrainedBox(constraints: const BoxConstraints(minHeight: 32), child: Row(
           children: [
             Text(
               label,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
+            if (labelAccessory != null) labelAccessory,
             if (labelTrailing != null) ...[const Spacer(), labelTrailing],
           ],
-        ),
+        )),
         const SizedBox(height: 6),
         GestureDetector(
           onDoubleTap: isLocked ? null : onDoubleTapLock,
@@ -2256,7 +2265,6 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                       decoration: InputDecoration(
                         hintText: hint,
                         suffixText: suffixText,
-                        suffixIcon: inputTrailing,
                         suffixStyle: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
