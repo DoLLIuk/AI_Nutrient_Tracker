@@ -1067,6 +1067,12 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
         editingMeal?.finalType ??
         classifyMealTypeByTime(_now);
     var formDraft = _MealFormDraft.fromMeal(editingMeal);
+    _MealEditField? activeNumericEdit;
+    var numericEditBase = formDraft;
+    void endNumericEdit() {
+      activeNumericEdit = null;
+      numericEditBase = formDraft;
+    }
     final initialFormDraft = formDraft;
     final initialMealType = selectedMealType;
     final initialMealName = nameCtrl.text;
@@ -1260,6 +1266,12 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       StateSetter setSheetState,
     ) {
       if (isApplyingDraft) return;
+      // Treat successive keystrokes as one edit. An intermediate zero/empty
+      // value must not replace the portion or macro ratios used as the basis.
+      if (editingMeal != null && activeNumericEdit != field) {
+        activeNumericEdit = field;
+        numericEditBase = formDraft;
+      }
       final parsedValue = _parseNonNegative(rawValue);
       if (parsedValue == null) {
         if (editingMeal == null && isMacroField(field)) {
@@ -1287,7 +1299,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
             ? formDraft.applyManualCalorieOverride(parsedValue)
             : formDraft.applyAddMealEdit(field, parsedValue);
       } else {
-        formDraft = formDraft.applyUserEdit(field, parsedValue);
+        formDraft = numericEditBase.applyUserEdit(field, parsedValue);
       }
       syncControllersFromDraft(preserveField: field);
       setSheetState(() {
@@ -1297,6 +1309,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
 
     void unlockField(_MealEditField field, StateSetter setSheetState) {
       formDraft = formDraft.unlockField(field);
+      endNumericEdit();
       syncControllersFromDraft();
       _trackMealEditEvent('meal_edit_unlock_field', {
         'source': mealEditSource,
@@ -1314,6 +1327,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     void lockField(_MealEditField field, StateSetter setSheetState) {
       if (formDraft.isLocked(field)) return;
       formDraft = formDraft.lockField(field);
+      endNumericEdit();
       syncControllersFromDraft();
       _trackMealEditEvent('meal_edit_lock_field', {
         'source': mealEditSource,
@@ -1330,6 +1344,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
 
     void resetAutoCalc(StateSetter setSheetState) {
       formDraft = formDraft.resetAutoCalc();
+      endNumericEdit();
       syncControllersFromDraft();
       _trackMealEditEvent('meal_edit_reset_auto_calc', {
         'source': mealEditSource,
@@ -1346,6 +1361,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     void useCalculatedCalories(StateSetter setSheetState) {
       if (editingMeal != null || !hasAllManualMacros()) return;
       formDraft = formDraft.useCalculatedCalories();
+      endNumericEdit();
       syncControllersFromDraft();
       _trackMealEditEvent('meal_edit_use_calculated_calories', {
         'source': mealEditSource,
@@ -1368,6 +1384,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     void restoreSessionStart(StateSetter setSheetState) {
       portionReviewed = editingMeal?.portionReviewed ?? true;
       formDraft = initialFormDraft;
+      endNumericEdit();
       selectedMealType = initialMealType;
       updateControllerText(nameCtrl, initialMealName);
       syncControllersFromDraft();
@@ -2498,7 +2515,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
 
   double? _parseNonNegative(String value) {
     final parsed = double.tryParse(value.trim().replaceAll(',', '.'));
-    if (parsed == null || parsed < 0) return null;
+    if (parsed == null || !parsed.isFinite || parsed < 0) return null;
     return parsed;
   }
 

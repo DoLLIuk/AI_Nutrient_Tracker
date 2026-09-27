@@ -73,6 +73,18 @@ Double-tap locking does not count as a manual macro edit by itself.
 When editing a saved meal:
 
 - Changing `Weight` proportionally scales only unlocked calories and macros. Weight is never derived from another value.
+- A pure weight edit preserves the recorded calorie density, including small
+  calorie-vs-macro differences in AI results. It does not silently replace
+  calories with the 4/9/4 formula. If macros are manually fixed, the existing
+  mixed-lock calculation rules continue to apply.
+- Consecutive keystrokes use a snapshot from before that numeric-field edit.
+  Intermediate zero, blank, or incomplete decimal input must not destroy the
+  starting portion density or macro proportions. Another numeric-field edit,
+  lock/unlock, recalculation, or revert establishes a new calculation basis.
+- Locking a field only changes its lock state; it must not change nutrition.
+  Unlocking Weight also preserves the current nutrition values.
+- Reject non-finite numeric input (`NaN`, infinity, overflowing exponents)
+  before calculations or saving; it must not corrupt diary persistence.
 - Changing protein, fat, or carbs locks that macro and recalculates calories when calories are not locked.
 - Changing calories locks calories and proportionally rebalances only unlocked macros where a valid rebalance is possible.
 - If valid rebalancing is impossible, the inconsistency remains visible instead of guessing.

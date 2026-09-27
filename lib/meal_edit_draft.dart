@@ -222,11 +222,8 @@ class _MealFormDraft {
 
   _MealFormDraft lockField(_MealEditField field) {
     final nextLockedFields = Set<_MealEditField>.from(lockedFields)..add(field);
-    final next = copyWith(lockedFields: nextLockedFields, clearError: true);
-    if (!next.isLocked(_MealEditField.calories)) {
-      return next._syncCaloriesToMacros();
-    }
-    return next._validateLockedCaloriesConflict();
+    // A lock changes permission to auto-adjust, never the recorded nutrition.
+    return copyWith(lockedFields: nextLockedFields);
   }
 
   _MealFormDraft unlockField(_MealEditField field) {
@@ -241,6 +238,9 @@ class _MealFormDraft {
       clearError: true,
       clearLastEditedField: lastEditedField == field,
     );
+    if (field == _MealEditField.weight) {
+      return next._validateExistingConsistency();
+    }
     if (!next.isLocked(_MealEditField.calories)) {
       return next._syncCaloriesToMacros();
     }
@@ -333,10 +333,9 @@ class _MealFormDraft {
   }
 
   _MealFormDraft _applyWeightChange({required double previousWeight}) {
-    if (previousWeight <= 0 || grams <= 0) {
-      return isLocked(_MealEditField.calories)
-          ? copyWith(clearError: true)
-          : _syncCaloriesToMacros();
+    if (previousWeight <= 0) {
+      // An unknown original weight gives no basis for scaling nutrition.
+      return _validateExistingConsistency();
     }
 
     final ratio = grams / previousWeight;
@@ -354,9 +353,15 @@ class _MealFormDraft {
       next = next.copyWith(carbsG: carbsG * ratio);
     }
 
-    return next.isLocked(_MealEditField.calories)
-        ? next._rebalanceUnlockedMacrosToTargetCalories()
-        : next._syncCaloriesToMacros();
+    if (next.isLocked(_MealEditField.calories)) {
+      return next._rebalanceUnlockedMacrosToTargetCalories();
+    }
+    // Pure portion changes scale all stored totals by the same ratio, including
+    // calories supplied by the backend. Normalize calories only when fixed
+    // macros prevent proportional scaling (or on an explicit macro edit).
+    return _macroFields.any(isLocked)
+        ? next._syncCaloriesToMacros()
+        : next._validateExistingConsistency();
   }
 
   _MealFormDraft _syncCaloriesToMacros() {
