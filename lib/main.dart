@@ -57,6 +57,7 @@ class MyApp extends StatefulWidget {
   final PhotoFoodRepository? repository;
   final PhotoPicker? photoPicker;
   final bool skipOnboarding;
+  final bool enableDemoQuickStart;
   final OnboardingResult? onboardingResult;
   final DateTime Function()? nowProvider;
   final Analytics? analytics;
@@ -68,6 +69,7 @@ class MyApp extends StatefulWidget {
     this.repository,
     this.photoPicker,
     this.skipOnboarding = false,
+    this.enableDemoQuickStart = kIsWeb,
     this.onboardingResult,
     this.nowProvider,
     this.analytics,
@@ -80,6 +82,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   static const _onboardingResultKey = 'app.onboarding.result';
   static const _onboardingDraftKey = 'app.onboarding.draft';
+  static const _demoFullOnboardingKey = 'app.demo.full_onboarding';
   static const _mealsKey = 'app.meals';
   static const _deletedMealIdsKey = 'app.meals.deleted_ids';
   static const _debugMealDetailsKey = 'app.debug.meal_details';
@@ -94,6 +97,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _showDebugMealDetails = kDebugMode;
   bool _isHydrated = false;
   bool _wasBackgrounded = false;
+  bool _showFullOnboarding = false;
+  bool _quickStartTracked = false;
   Future<void> _persistQueue = Future<void>.value();
 
   @override
@@ -149,13 +154,20 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       final restoredResult =
           widget.onboardingResult ?? _decodeOnboardingResult(resultRaw);
       final restoredDraft = _decodeOnboardingDraft(draftRaw);
-      _controller.deletedRequestIds.addAll(prefs.getStringList(_deletedMealIdsKey) ?? const []);
+      final savedFullOnboarding = prefs.getBool(_demoFullOnboardingKey);
+      _controller.deletedRequestIds.addAll(
+        prefs.getStringList(_deletedMealIdsKey) ?? const [],
+      );
       final restoredMeals = _decodeMeals(mealsRaw)
-          .where((m) => !_controller.deletedRequestIds.contains(m.requestId)).toList();
+          .where((m) => !_controller.deletedRequestIds.contains(m.requestId))
+          .toList();
 
       setState(() {
         _onboardingResult = restoredResult;
         _onboardingDraft = restoredDraft;
+        _showFullOnboarding =
+            savedFullOnboarding ??
+            (restoredResult == null && _hasStartedOnboarding(restoredDraft));
         _persistedMeals = restoredMeals;
         _showDebugMealDetails = debugMealDetails ?? kDebugMode;
         _isHydrated = true;
@@ -163,10 +175,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       if (kDebugMode) {
         debugPrint('[persistence] Hydrated app state');
       }
+      _trackQuickStartIfNeeded();
       return;
     }
 
     setState(() => _isHydrated = true);
+    _trackQuickStartIfNeeded();
     if (kDebugMode) {
       debugPrint(
         '[persistence] Hydration skipped: SharedPreferences unavailable',
@@ -177,6 +191,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   Future<void> _persistState() async {
     final prefs = await _prefsOrNull();
     if (prefs == null) return;
+    await prefs.setBool(_demoFullOnboardingKey, _showFullOnboarding);
 
     if (_onboardingResult == null) {
       await prefs.remove(_onboardingResultKey);
@@ -207,7 +222,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       jsonEncode(savedMeals.map((m) => m.toJson()).toList()),
     );
     if (saved) {
-      await _controller.acknowledgeSaved({...savedMeals.map((m) => m.requestId), ...savedDeletions}, receipt);
+      await _controller.acknowledgeSaved({
+        ...savedMeals.map((m) => m.requestId),
+        ...savedDeletions,
+      }, receipt);
     }
     await prefs.setBool(_debugMealDetailsKey, _showDebugMealDetails);
   }
@@ -237,6 +255,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     setState(() {
       _onboardingResult = result;
       _onboardingDraft = null;
+      _showFullOnboarding = false;
     });
     await _enqueuePersistState(reason: 'onboarding_completed');
     if (!isProfileEdit) {
@@ -245,6 +264,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   }
 
   Future<void> _openProfileEditor(BuildContext context) async {
+    if (_isDemoQuickStart) {
+      _startFullOnboarding();
+      return;
+    }
     final initialDraft = _buildProfileEditDraft();
     final updatedResult = await Navigator.of(context).push<OnboardingResult>(
       MaterialPageRoute(
@@ -364,8 +387,33 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     setState(() {
       _onboardingResult = null;
       _onboardingDraft = null;
+      _showFullOnboarding = false;
     });
     _enqueuePersistState(reason: 'onboarding_reset');
+  }
+
+  bool get _isDemoQuickStart =>
+      widget.enableDemoQuickStart &&
+      !widget.skipOnboarding &&
+      _onboardingResult == null &&
+      !_showFullOnboarding;
+
+  void _trackQuickStartIfNeeded() {
+    if (!_isDemoQuickStart || _quickStartTracked) return;
+    _quickStartTracked = true;
+    _analytics.track(AnalyticsEvent(AnalyticsEvents.demoQuickStartViewed));
+  }
+
+  void _startFullOnboarding() {
+    _analytics.track(AnalyticsEvent(AnalyticsEvents.demoPersonalizeTapped));
+    setState(() => _showFullOnboarding = true);
+    _enqueuePersistState(reason: 'demo_full_onboarding_selected');
+  }
+
+  void _returnToQuickStart() {
+    setState(() => _showFullOnboarding = false);
+    _enqueuePersistState(reason: 'demo_quick_start_selected');
+    _trackQuickStartIfNeeded();
   }
 
   @override
@@ -404,10 +452,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       ),
       home: !_isHydrated
           ? const _BootstrapLoadingScreen()
-          : widget.skipOnboarding || _onboardingResult != null
+          : widget.skipOnboarding ||
+                _onboardingResult != null ||
+                _isDemoQuickStart
           ? _AppShell(
               controller: _controller,
-              onboardingResult: _onboardingResult,
+              onboardingResult:
+                  _onboardingResult ??
+                  (_isDemoQuickStart ? _demoSampleResult : null),
+              isDemoQuickStart: _isDemoQuickStart,
+              onPersonalizeDemo: _startFullOnboarding,
               initialMeals: _persistedMeals,
               onMealsChanged: _handleMealsChanged,
               analytics: _analytics,
@@ -420,6 +474,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             )
           : OnboardingFlow(
               initialDraft: _onboardingDraft,
+              onExploreSample: widget.enableDemoQuickStart
+                  ? _returnToQuickStart
+                  : null,
               onDraftChanged: _handleOnboardingDraftChanged,
               onStarted: () => _analytics.track(
                 AnalyticsEvent(AnalyticsEvents.onboardingStarted),
@@ -436,6 +493,36 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   }
 }
 
+bool _hasStartedOnboarding(OnboardingDraft? draft) =>
+    draft != null &&
+    (draft.step > 0 ||
+        draft.goalType != null ||
+        draft.sexType != null ||
+        draft.ageText.isNotEmpty ||
+        draft.heightText.isNotEmpty ||
+        draft.weightText.isNotEmpty);
+
+final _demoSampleResult = OnboardingResult(
+  goalType: GoalType.maintain,
+  sex: SexType.female,
+  age: 30,
+  heightCm: 165,
+  weightKg: 65,
+  activityLevel: ActivityLevel.lightlyActive,
+  targetPace: TargetPace.maintain,
+  macroProfile: MacroProfile.balanced,
+  plan: calculateNutritionPlan(
+    goalType: GoalType.maintain,
+    sex: SexType.female,
+    age: 30,
+    heightCm: 165,
+    weightKg: 65,
+    activityLevel: ActivityLevel.lightlyActive,
+    pace: TargetPace.maintain,
+    macroProfile: MacroProfile.balanced,
+  ),
+);
+
 class _BootstrapLoadingScreen extends StatelessWidget {
   const _BootstrapLoadingScreen();
   @override
@@ -451,6 +538,8 @@ class _BootstrapLoadingScreen extends StatelessWidget {
 class _AppShell extends StatefulWidget {
   final PhotoFoodController controller;
   final OnboardingResult? onboardingResult;
+  final bool isDemoQuickStart;
+  final VoidCallback onPersonalizeDemo;
   final List<_MealEntry> initialMeals;
   final ValueChanged<List<_MealEntry>> onMealsChanged;
   final VoidCallback onResetOnboarding;
@@ -464,6 +553,8 @@ class _AppShell extends StatefulWidget {
   const _AppShell({
     required this.controller,
     this.onboardingResult,
+    required this.isDemoQuickStart,
+    required this.onPersonalizeDemo,
     required this.initialMeals,
     required this.onMealsChanged,
     required this.onResetOnboarding,
@@ -494,6 +585,8 @@ class _AppShellState extends State<_AppShell> {
             key: _homeKey,
             controller: widget.controller,
             onboardingResult: widget.onboardingResult,
+            isDemoQuickStart: widget.isDemoQuickStart,
+            onPersonalizeDemo: widget.onPersonalizeDemo,
             initialMeals: widget.initialMeals,
             onMealsChanged: widget.onMealsChanged,
             nowProvider: widget.nowProvider,
@@ -554,6 +647,8 @@ class _AppShellState extends State<_AppShell> {
 class _CaloriesHomePage extends StatefulWidget {
   final PhotoFoodController controller;
   final OnboardingResult? onboardingResult;
+  final bool isDemoQuickStart;
+  final VoidCallback onPersonalizeDemo;
   final List<_MealEntry> initialMeals;
   final ValueChanged<List<_MealEntry>> onMealsChanged;
   final DateTime Function()? nowProvider;
@@ -565,6 +660,8 @@ class _CaloriesHomePage extends StatefulWidget {
     super.key,
     required this.controller,
     this.onboardingResult,
+    required this.isDemoQuickStart,
+    required this.onPersonalizeDemo,
     this.initialMeals = const [],
     required this.onMealsChanged,
     this.nowProvider,
@@ -777,18 +874,25 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       return;
     }
     final totals = response.meta.estimatedTotals;
-    final existingIndex = meals.indexWhere((m) => m.requestId == response.requestId);
+    final existingIndex = meals.indexWhere(
+      (m) => m.requestId == response.requestId,
+    );
     if (existingIndex >= 0) {
       final existing = meals[existingIndex];
       // Replayed analysis must not overwrite a user's edits, category or date.
       final expectedRevision = widget.controller.resultBaseRevision;
       if (response.meta.confirmationSource != null &&
-          (expectedRevision == null ? !existing.portionReviewed : existing.revision == expectedRevision)) {
+          (expectedRevision == null
+              ? !existing.portionReviewed
+              : existing.revision == expectedRevision)) {
         setState(() {
           meals[existingIndex] = existing.copyWith(
-            kcal: totals?.kcal, proteinG: totals?.proteinG,
-            fatG: totals?.fatG, carbsG: totals?.carbsG,
-            portionG: response.meta.estimatedPortionG, portionReviewed: true,
+            kcal: totals?.kcal,
+            proteinG: totals?.proteinG,
+            fatG: totals?.fatG,
+            carbsG: totals?.carbsG,
+            portionG: response.meta.estimatedPortionG,
+            portionReviewed: true,
             revision: existing.revision + 1,
           );
           _rebuildSessionsForDay(existing.day, notify: false);
@@ -825,7 +929,9 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       portionG: response.meta.estimatedPortionG,
       confidence: response.item.confidence,
       portionReviewed: response.meta.confirmationSource != null,
-      revision: response.meta.confirmationSource == null ? 0 : (widget.controller.resultBaseRevision ?? 0) + 1,
+      revision: response.meta.confirmationSource == null
+          ? 0
+          : (widget.controller.resultBaseRevision ?? 0) + 1,
       per100Kcal: response.item.nutritionPer100g.kcal,
       per100ProteinG: response.item.nutritionPer100g.proteinG,
       per100CarbsG: response.item.nutritionPer100g.carbsG,
@@ -855,10 +961,25 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       await _resumePhotoDraft();
       return;
     }
-    final scanDate = _selectedDate;
-    final capturedAt = _now;
     final action = await _showAddActionSheet();
     if (action == null) return;
+    await _handleAddAction(action);
+  }
+
+  Future<void> _onSampleMealTap() async {
+    widget.analytics.track(
+      AnalyticsEvent(AnalyticsEvents.demoSampleMealTapped),
+    );
+    await _handleAddAction(_AddAction.sample);
+  }
+
+  Future<void> _handleAddAction(_AddAction action) async {
+    if (widget.controller.hasDraft) {
+      await _resumePhotoDraft();
+      return;
+    }
+    final scanDate = _selectedDate;
+    final capturedAt = _now;
 
     if (action == _AddAction.manual) {
       await _showManualMealSheet();
@@ -873,14 +994,26 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
         ? PickSource.camera
         : PickSource.gallery;
     final pickedFile = samplePath == null
-        ? await widget.controller.pickImage(source, diaryDate: scanDate, capturedAt: capturedAt)
-        : await widget.controller.pickSampleImage(samplePath, diaryDate: scanDate, capturedAt: capturedAt);
+        ? await widget.controller.pickImage(
+            source,
+            diaryDate: scanDate,
+            capturedAt: capturedAt,
+          )
+        : await widget.controller.pickSampleImage(
+            samplePath,
+            diaryDate: scanDate,
+            capturedAt: capturedAt,
+          );
     if (!mounted || pickedFile == null) return;
 
     final clarification = await _showClarificationBottomSheet();
     if (!mounted) return;
 
-    await widget.controller.analyzePickedImage(clarification: clarification, diaryDate: scanDate, capturedAt: capturedAt);
+    await widget.controller.analyzePickedImage(
+      clarification: clarification,
+      diaryDate: scanDate,
+      capturedAt: capturedAt,
+    );
     if (!mounted) return;
     final photoState = widget.controller.state;
     final sourceName = samplePath == null ? source.name : 'sample';
@@ -934,8 +1067,12 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.photoAnalysisAvailable) ...[
-                const Padding(padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: Text('Photograph one whole plate, including sides. Add drinks and separate dishes separately.')),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Text(
+                    'Photograph one whole plate, including sides. Add drinks and separate dishes separately.',
+                  ),
+                ),
                 if (!kIsWeb)
                   ListTile(
                     key: const Key('pick-camera'),
@@ -1073,6 +1210,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       activeNumericEdit = null;
       numericEditBase = formDraft;
     }
+
     final initialFormDraft = formDraft;
     final initialMealType = selectedMealType;
     final initialMealName = nameCtrl.text;
@@ -1288,7 +1426,9 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
         return;
       }
 
-      if (field == _MealEditField.weight && parsedValue > 0) portionReviewed = true;
+      if (field == _MealEditField.weight && parsedValue > 0) {
+        portionReviewed = true;
+      }
       if (editingMeal == null && isMacroField(field)) {
         manuallyEnteredMacroFields.add(field);
       }
@@ -1637,22 +1777,42 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                       controller: gramsCtrl,
                                       fieldKeySuffix: 'weight',
                                       label: 'Weight',
-                                      labelAccessory: editingMeal?.origin == MealOrigin.ai && !portionReviewed
+                                      labelAccessory:
+                                          editingMeal?.origin ==
+                                                  MealOrigin.ai &&
+                                              !portionReviewed
                                           ? TextButton(
-                                              key: const Key('portion-mark-reviewed'),
+                                              key: const Key(
+                                                'portion-mark-reviewed',
+                                              ),
                                               style: TextButton.styleFrom(
-                                                foregroundColor: const Color(0xFF64748B),
+                                                foregroundColor: const Color(
+                                                  0xFF64748B,
+                                                ),
                                                 minimumSize: const Size(44, 32),
                                                 padding: EdgeInsets.zero,
-                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                tapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
                                               ),
-                                              onPressed: () => setSheetState(() => portionReviewed = true),
+                                              onPressed: () => setSheetState(
+                                                () => portionReviewed = true,
+                                              ),
                                               child: const Tooltip(
-                                                message: 'Estimated weight. Mark as checked. To correct it, edit the number.',
-                                                child: Text('≈', semanticsLabel: 'Estimated weight. Mark as checked',
-                                                  style: TextStyle(fontSize: 20, height: 1)),
+                                                message:
+                                                    'Estimated weight. Mark as checked. To correct it, edit the number.',
+                                                child: Text(
+                                                  '≈',
+                                                  semanticsLabel:
+                                                      'Estimated weight. Mark as checked',
+                                                  style: TextStyle(
+                                                    fontSize: 20,
+                                                    height: 1,
+                                                  ),
+                                                ),
                                               ),
-                                            ) : null,
+                                            )
+                                          : null,
                                       hint: numericHint(
                                         _MealEditField.weight,
                                         editingMeal?.portionG,
@@ -2235,16 +2395,22 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ConstrainedBox(constraints: const BoxConstraints(minHeight: 32), child: Row(
-          children: [
-            Text(
-              label,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            ?labelAccessory,
-            if (labelTrailing != null) ...[const Spacer(), labelTrailing],
-          ],
-        )),
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 32),
+          child: Row(
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              ?labelAccessory,
+              if (labelTrailing != null) ...[const Spacer(), labelTrailing],
+            ],
+          ),
+        ),
         const SizedBox(height: 6),
         GestureDetector(
           onDoubleTap: isLocked ? null : onDoubleTapLock,
@@ -2561,101 +2727,110 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                   HomeStatus.confirmingPortion;
               return Material(
                 color: Colors.transparent,
-                child: SingleChildScrollView(child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Confirm portion',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Confirm portion',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Total weight of all food, including sides, without the plate. Enter it if known to refine the estimate.',
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      aiEstimate == null
-                          ? 'AI estimate is unavailable.'
-                          : 'AI estimate: ${aiEstimate.toStringAsFixed(0)} g',
-                      key: const Key('portion-ai-estimate'),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF6B7280),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Total weight of all food, including sides, without the plate. Enter it if known to refine the estimate.',
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      key: const Key('portion-input'),
-                      controller: inputController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
+                      const SizedBox(height: 6),
+                      Text(
+                        aiEstimate == null
+                            ? 'AI estimate is unavailable.'
+                            : 'AI estimate: ${aiEstimate.toStringAsFixed(0)} g',
+                        key: const Key('portion-ai-estimate'),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF6B7280),
+                        ),
                       ),
-                      decoration: InputDecoration(
-                        labelText: 'Total food weight (g)',
-                        errorText: localError,
-                        border: const OutlineInputBorder(),
+                      const SizedBox(height: 12),
+                      TextField(
+                        key: const Key('portion-input'),
+                        controller: inputController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Total food weight (g)',
+                          errorText: localError,
+                          border: const OutlineInputBorder(),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        key: const Key('portion-confirm'),
-                        onPressed: isLoading
-                            ? null
-                            : () async {
-                                final validation =
-                                    PhotoFoodController.validatePortionInput(
-                                      inputController.text,
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          key: const Key('portion-confirm'),
+                          onPressed: isLoading
+                              ? null
+                              : () async {
+                                  final validation =
+                                      PhotoFoodController.validatePortionInput(
+                                        inputController.text,
+                                      );
+                                  if (validation != null) {
+                                    setModalState(
+                                      () => localError = validation,
                                     );
-                                if (validation != null) {
-                                  setModalState(() => localError = validation);
-                                  return;
-                                }
-                                final grams = double.parse(
-                                  inputController.text.trim().replaceAll(
-                                    ',',
-                                    '.',
+                                    return;
+                                  }
+                                  final grams = double.parse(
+                                    inputController.text.trim().replaceAll(
+                                      ',',
+                                      '.',
+                                    ),
+                                  );
+                                  final ok = await widget.controller
+                                      .confirmPortion(
+                                        grams,
+                                        baseRevision: baseRevision,
+                                      );
+                                  if (!context.mounted) return;
+                                  if (ok) Navigator.of(context).pop();
+                                },
+                          child: isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
                                   ),
-                                );
-                                final ok = await widget.controller
-                                    .confirmPortion(grams, baseRevision: baseRevision);
-                                if (!context.mounted) return;
-                                if (ok) Navigator.of(context).pop();
-                              },
-                        child: isLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Confirm portion'),
+                                )
+                              : const Text('Confirm portion'),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        key: const Key('portion-use-ai-estimate'),
-                        onPressed: isLoading || aiEstimate == null
-                            ? null
-                            : () async {
-                                final ok = await widget.controller
-                                    .confirmPortionWithAiEstimate(baseRevision: baseRevision);
-                                if (!context.mounted) return;
-                                if (ok) Navigator.of(context).pop();
-                              },
-                        child: const Text('Not sure, use AI estimate'),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          key: const Key('portion-use-ai-estimate'),
+                          onPressed: isLoading || aiEstimate == null
+                              ? null
+                              : () async {
+                                  final ok = await widget.controller
+                                      .confirmPortionWithAiEstimate(
+                                        baseRevision: baseRevision,
+                                      );
+                                  if (!context.mounted) return;
+                                  if (ok) Navigator.of(context).pop();
+                                },
+                          child: const Text('Not sure, use AI estimate'),
+                        ),
                       ),
-                    ),
-                  ],
-                )),
+                    ],
+                  ),
+                ),
               );
             },
           ),
@@ -2893,13 +3068,25 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                 if (!meal.isCategoryOnly)
                   Text('Time: ${_timeLabelFromDateTime(meal.consumedAt)}'),
                 const SizedBox(height: 12),
-                Row(children: [
-                  Text('Portion: ${meal.portionG?.toStringAsFixed(0) ?? '-'} g'),
-                  if (meal.origin == MealOrigin.ai && !meal.portionReviewed)
-                    const Padding(padding: EdgeInsets.only(left: 6), child: Tooltip(
-                      message: 'Portion not yet checked',
-                      child: Icon(Icons.fact_check_outlined, size: 18, color: Color(0xFF64748B)))),
-                ]),
+                Row(
+                  children: [
+                    Text(
+                      'Portion: ${meal.portionG?.toStringAsFixed(0) ?? '-'} g',
+                    ),
+                    if (meal.origin == MealOrigin.ai && !meal.portionReviewed)
+                      const Padding(
+                        padding: EdgeInsets.only(left: 6),
+                        child: Tooltip(
+                          message: 'Portion not yet checked',
+                          child: Icon(
+                            Icons.fact_check_outlined,
+                            size: 18,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
                 Text('Calories: ${meal.kcal.toStringAsFixed(1)} kcal'),
                 Text('Protein: ${meal.proteinG.toStringAsFixed(1)} g'),
                 Text('Fat: ${meal.fatG.toStringAsFixed(1)} g'),
@@ -3118,6 +3305,10 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildHeader(fireCount: daySessions.length),
+                    if (widget.isDemoQuickStart) ...[
+                      const SizedBox(height: 14),
+                      _buildDemoQuickStartCard(),
+                    ],
                     const SizedBox(height: 18),
                     _buildDaysRow(),
                     const SizedBox(height: 18),
@@ -3126,23 +3317,45 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                       const SizedBox(height: 14),
                     ],
                     if (state.status == HomeStatus.draftReady) ...[
-                      Container(width: double.infinity,
+                      Container(
+                        width: double.infinity,
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: const Color(0xFFE2E6EF))),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: const Color(0xFFE2E6EF)),
+                        ),
                         child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [const Text('Your photo is ready', style: TextStyle(fontWeight: FontWeight.w600)),
-                          const Text('Continue when you are ready to log it.'),
-                          Wrap(spacing: 8, children: [
-                            FilledButton(key: const Key('photo-draft-continue'), onPressed: _resumePhotoDraft,
-                              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2B66F6)),
-                              child: const Text('Continue')),
-                            TextButton(key: const Key('photo-draft-discard'), onPressed: widget.controller.discardPending,
-                              child: const Text('Discard')),
-                          ]),
-                        ],
-                      )),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Your photo is ready',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            const Text(
+                              'Continue when you are ready to log it.',
+                            ),
+                            Wrap(
+                              spacing: 8,
+                              children: [
+                                FilledButton(
+                                  key: const Key('photo-draft-continue'),
+                                  onPressed: _resumePhotoDraft,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2B66F6),
+                                  ),
+                                  child: const Text('Continue'),
+                                ),
+                                TextButton(
+                                  key: const Key('photo-draft-discard'),
+                                  onPressed: widget.controller.discardPending,
+                                  child: const Text('Discard'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 14),
                     ],
                     _buildCaloriesCard(
@@ -3209,8 +3422,17 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
               ),
             ),
             if (isLoading)
-              const Positioned(top: 0, left: 0, right: 0,
-                child: IgnorePointer(child: LinearProgressIndicator(key: Key('photo-background-progress'), minHeight: 2))),
+              const Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: LinearProgressIndicator(
+                    key: Key('photo-background-progress'),
+                    minHeight: 2,
+                  ),
+                ),
+              ),
           ],
         );
       },
@@ -3250,6 +3472,87 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildDemoQuickStartCard() {
+    return Container(
+      key: const Key('demo-quick-start-card'),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF3EC),
+        border: Border.all(color: const Color(0xFFC8DFCE)),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'SAMPLE PLAN',
+            style: TextStyle(
+              color: Color(0xFF2C6A48),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            'Explore without setting up a profile',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Example: woman, 30 · 165 cm · 65 kg · lightly active. Maintenance goal.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF52685B),
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              FilledButton.icon(
+                key: const Key('demo-try-sample-meal'),
+                onPressed: widget.photoAnalysisAvailable
+                    ? _onSampleMealTap
+                    : null,
+                icon: const Icon(Icons.restaurant_outlined, size: 17),
+                label: const Text('Try a sample meal'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF173E32),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 38),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  textStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              TextButton(
+                key: const Key('demo-personalize'),
+                onPressed: widget.onPersonalizeDemo,
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF245C41),
+                  minimumSize: const Size(0, 38),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  textStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                child: const Text('Set my own plan'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -3454,20 +3757,38 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                     await widget.controller.retryLastAnalysis();
                   },
                   icon: const Icon(Icons.refresh_rounded, size: 18),
-                  label: Text(widget.controller.hasPendingScan ? 'Check scan' : 'Try again'),
+                  label: Text(
+                    widget.controller.hasPendingScan
+                        ? 'Check scan'
+                        : 'Try again',
+                  ),
                 ),
                 if (widget.controller.hasPendingScan)
                   TextButton(
                     key: const Key('photo-error-discard'),
                     onPressed: () async {
-                      final discard = await showDialog<bool>(context: context,
+                      final discard = await showDialog<bool>(
+                        context: context,
                         builder: (context) => AlertDialog(
                           title: const Text('Discard saved scan?'),
-                          content: const Text('The unfinished scan will be removed from this device.'),
-                          actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep')),
-                            TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard'))],
-                        ));
-                      if (discard == true) await widget.controller.discardPending();
+                          content: const Text(
+                            'The unfinished scan will be removed from this device.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Keep'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Discard'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (discard == true) {
+                        await widget.controller.discardPending();
+                      }
                     },
                     child: const Text('Discard scan'),
                   ),
@@ -3859,7 +4180,8 @@ class _MealEntry {
       fatG: (json['fatG'] as num?)?.toDouble() ?? 0,
       portionG: (json['portionG'] as num?)?.toDouble(),
       confidence: (json['confidence'] as num?)?.toDouble() ?? 0,
-      portionReviewed: json['portionReviewed'] as bool? ?? origin == MealOrigin.manual,
+      portionReviewed:
+          json['portionReviewed'] as bool? ?? origin == MealOrigin.manual,
       revision: json['revision'] as int? ?? 0,
       per100Kcal: (json['per100Kcal'] as num?)?.toDouble() ?? 0,
       per100ProteinG: (json['per100ProteinG'] as num?)?.toDouble() ?? 0,

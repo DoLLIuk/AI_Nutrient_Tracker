@@ -23,6 +23,9 @@ class AnalyticsEvents {
   static const onboardingStarted = 'onboarding_started';
   static const onboardingStepViewed = 'onboarding_step_viewed';
   static const onboardingCompleted = 'onboarding_completed';
+  static const demoQuickStartViewed = 'demo_quick_start_viewed';
+  static const demoSampleMealTapped = 'demo_sample_meal_tapped';
+  static const demoPersonalizeTapped = 'demo_personalize_tapped';
   static const firstMealLogged = 'first_meal_logged';
   static const mealLogged = 'meal_logged';
   static const mealLoggedInExistingSession = 'meal_logged_in_existing_session';

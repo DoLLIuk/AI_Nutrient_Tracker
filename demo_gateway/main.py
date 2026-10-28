@@ -27,6 +27,7 @@ IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 EVENT_NAMES = {
     "app_opened", "onboarding_started", "onboarding_step_viewed",
     "onboarding_completed", "first_meal_logged", "meal_logged",
+    "demo_quick_start_viewed", "demo_sample_meal_tapped", "demo_personalize_tapped",
     "meal_logged_in_existing_session", "meal_edited", "meal_deleted",
     "photo_analysis_succeeded", "photo_analysis_failed", "manual_fallback_used",
 }

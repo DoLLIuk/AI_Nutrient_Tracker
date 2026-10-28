@@ -33,6 +33,71 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
+  testWidgets(
+    'web demo opens a labeled sample plan and the sample meal picker',
+    (tester) async {
+      final analytics = _RecordingAnalytics();
+      final controller = PhotoFoodController(
+        repository: _FakeRepository(),
+        photoPicker: _FakePicker(file: null),
+      );
+      await tester.pumpWidget(
+        MyApp(
+          controller: controller,
+          analytics: analytics,
+          enableDemoQuickStart: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('demo-quick-start-card')), findsOneWidget);
+      expect(find.textContaining('Example: woman, 30'), findsOneWidget);
+      expect(find.text('1884'), findsOneWidget);
+      expect(
+        analytics.events.map((e) => e.name),
+        contains(AnalyticsEvents.demoQuickStartViewed),
+      );
+      expect(
+        analytics.events.map((e) => e.name),
+        isNot(contains(AnalyticsEvents.onboardingCompleted)),
+      );
+
+      await tester.tap(find.byKey(const Key('demo-try-sample-meal')));
+      await tester.pumpAndSettle();
+      expect(find.text('Choose a sample meal'), findsOneWidget);
+      expect(find.byKey(const Key('sample-meal-0')), findsOneWidget);
+      expect(
+        analytics.events.map((e) => e.name),
+        contains(AnalyticsEvents.demoSampleMealTapped),
+      );
+    },
+  );
+
+  testWidgets('web demo can open full onboarding and return to sample plan', (
+    tester,
+  ) async {
+    final controller = PhotoFoodController(
+      repository: _FakeRepository(),
+      photoPicker: _FakePicker(file: null),
+    );
+    await tester.pumpWidget(
+      MyApp(controller: controller, enableDemoQuickStart: true),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('demo-personalize')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Get started'), findsOneWidget);
+    expect(find.byKey(const Key('demo-quick-start-card')), findsNothing);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('app.demo.full_onboarding'), isTrue);
+
+    await tester.tap(find.byKey(const Key('onboarding-explore-sample')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('demo-quick-start-card')), findsOneWidget);
+    expect(prefs.getBool('app.demo.full_onboarding'), isFalse);
+  });
+
   testWidgets('tap + opens source bottom sheet', (tester) async {
     final controller = PhotoFoodController(
       repository: _FakeRepository(),
@@ -245,7 +310,9 @@ void main() {
     final analytics = _RecordingAnalytics();
     final controller = PhotoFoodController(
       repository: _FakeRepository(requiresConfirmation: true),
-      photoPicker: _FakePicker(file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg')),
+      photoPicker: _FakePicker(
+        file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg'),
+      ),
     );
 
     await tester.pumpWidget(
@@ -285,7 +352,9 @@ void main() {
     final analytics = _RecordingAnalytics();
     final controller = PhotoFoodController(
       repository: _FailingRepository(),
-      photoPicker: _FakePicker(file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg')),
+      photoPicker: _FakePicker(
+        file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg'),
+      ),
     );
 
     await tester.pumpWidget(
@@ -326,7 +395,9 @@ void main() {
       );
       final controller = PhotoFoodController(
         repository: repository,
-        photoPicker: _FakePicker(file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg')),
+        photoPicker: _FakePicker(
+          file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg'),
+        ),
       );
 
       await tester.pumpWidget(
@@ -383,7 +454,9 @@ void main() {
       final repository = _FakeRepository();
       final controller = PhotoFoodController(
         repository: repository,
-        photoPicker: _FakePicker(file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg')),
+        photoPicker: _FakePicker(
+          file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg'),
+        ),
       );
 
       await tester.pumpWidget(
@@ -417,7 +490,9 @@ void main() {
     final repository = _FakeRepository();
     final controller = PhotoFoodController(
       repository: repository,
-      photoPicker: _FakePicker(file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg')),
+      photoPicker: _FakePicker(
+        file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg'),
+      ),
     );
 
     await tester.pumpWidget(
@@ -444,7 +519,9 @@ void main() {
     final repository = _FakeRepository();
     final controller = PhotoFoodController(
       repository: repository,
-      photoPicker: _FakePicker(file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg')),
+      photoPicker: _FakePicker(
+        file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg'),
+      ),
     );
 
     await tester.pumpWidget(
@@ -471,7 +548,9 @@ void main() {
   ) async {
     final controller = PhotoFoodController(
       repository: _FakeRepository(requiresConfirmation: true),
-      photoPicker: _FakePicker(file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg')),
+      photoPicker: _FakePicker(
+        file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg'),
+      ),
     );
 
     await tester.pumpWidget(
@@ -1457,9 +1536,10 @@ void main() {
       }),
     });
 
-    await tester.pumpWidget(MyApp(controller: controller));
+    await tester.pumpWidget(MyApp(controller: controller, enableDemoQuickStart: true));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('fab-add')), findsOneWidget);
+    expect(find.byKey(const Key('demo-quick-start-card')), findsNothing);
     expect(find.text('Track calories from food photos'), findsNothing);
   });
 
@@ -1489,10 +1569,11 @@ void main() {
       }),
     });
 
-    await tester.pumpWidget(MyApp(controller: controller));
+    await tester.pumpWidget(MyApp(controller: controller, enableDemoQuickStart: true));
     await tester.pumpAndSettle();
 
     expect(find.text('Basic profile'), findsOneWidget);
+    expect(find.byKey(const Key('demo-quick-start-card')), findsNothing);
     expect(find.text('Track calories from food photos'), findsNothing);
   });
 

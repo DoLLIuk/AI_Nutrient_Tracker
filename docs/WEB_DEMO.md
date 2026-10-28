@@ -25,6 +25,9 @@ GitHub Pages serves `web/` and the compiled Flutter app. The app runs inside `#f
 
 ## Demo-specific experience
 
+- New web visitors without a completed profile or an active onboarding choice land on Home with an explicitly labeled example plan (woman, 30 years, 165 cm, 65 kg, lightly active, maintenance; 1884 kcal, 104 g protein, 250 g carbs, 52 g fat). This is a sample, not a personal target. It is computed with the same plan function as onboarding and is not saved as their profile.
+- The Home sample card opens the sample-meal picker directly and links to the complete onboarding. Visitors can return from the onboarding welcome screen to the sample plan. Completed profiles and in-progress onboarding are restored from browser storage; meals stay intact when a visitor personalizes the plan.
+- Gateway events `demo_quick_start_viewed`, `demo_sample_meal_tapped`, and `demo_personalize_tapped` distinguish the new entry path. These names must be deployed to the gateway allowlist before the Pages client uses them. No sample profile details are sent as event properties.
 - The basic-profile onboarding step offers clearly labeled sample values: female, 30 years, 165 cm, 65 kg. Other onboarding choices remain interactive.
 - Five generated sample food photos are bundled under `assets/demo_food/`; uploads and sample photos both use real AI analysis.
 - Manual logging remains available after photo errors or quota exhaustion.

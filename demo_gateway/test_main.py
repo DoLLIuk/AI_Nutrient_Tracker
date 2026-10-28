@@ -123,6 +123,27 @@ def test_onboarding_event_is_admitted_without_profile_data(monkeypatch):
     assert captured["step"] == 2
 
 
+def test_quick_start_event_is_admitted_without_profile_data(monkeypatch):
+    captured = {}
+
+    def reserve(*args):
+        captured["action"], _, _, captured["name"], captured["step"] = args
+        return True
+
+    monkeypatch.setattr(main, "reserve_quota", reserve)
+    response = client.post(
+        "/v0/demo/event",
+        headers=HEADERS,
+        json={"name": "demo_quick_start_viewed", "weight_kg": 65},
+    )
+    assert response.status_code == 200
+    assert captured == {
+        "action": "event",
+        "name": "demo_quick_start_viewed",
+        "step": None,
+    }
+
+
 def test_unknown_event_is_rejected_before_firestore(monkeypatch):
     monkeypatch.setattr(main, "reserve_quota", lambda *args: (_ for _ in ()).throw(AssertionError()))
     response = client.post(

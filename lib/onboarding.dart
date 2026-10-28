@@ -65,6 +65,7 @@ class OnboardingFlow extends StatefulWidget {
   final Future<void> Function(OnboardingResult result) onCompleted;
   final ValueChanged<OnboardingDraft>? onDraftChanged;
   final VoidCallback? onStarted;
+  final VoidCallback? onExploreSample;
   final ValueChanged<int>? onStepViewed;
   final OnboardingDraft? initialDraft;
   final bool popOnBackAtEntryStep;
@@ -74,6 +75,7 @@ class OnboardingFlow extends StatefulWidget {
     required this.onCompleted,
     this.onDraftChanged,
     this.onStarted,
+    this.onExploreSample,
     this.onStepViewed,
     this.initialDraft,
     this.popOnBackAtEntryStep = false,
@@ -344,7 +346,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 180),
         child: switch (_step) {
-          0 => _WelcomeScreen(onContinue: _startOnboarding),
+          0 => _WelcomeScreen(
+            onContinue: _startOnboarding,
+            onExploreSample: widget.onExploreSample,
+          ),
           1 => _StepScaffold(
             key: const ValueKey('goal-step'),
             step: 1,
@@ -550,8 +555,9 @@ class _StepScaffold extends StatelessWidget {
 
 class _WelcomeScreen extends StatelessWidget {
   final VoidCallback onContinue;
+  final VoidCallback? onExploreSample;
 
-  const _WelcomeScreen({required this.onContinue});
+  const _WelcomeScreen({required this.onContinue, this.onExploreSample});
 
   @override
   Widget build(BuildContext context) {
@@ -620,6 +626,17 @@ class _WelcomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
+              if (onExploreSample != null) ...[
+                const SizedBox(height: 8),
+                TextButton(
+                  key: const Key('onboarding-explore-sample'),
+                  onPressed: onExploreSample,
+                  child: const Text(
+                    'Explore the sample plan',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
