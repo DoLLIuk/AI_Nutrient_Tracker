@@ -247,6 +247,22 @@ a { color: inherit; }
 }
 .site-footer p { margin: 0; }
 
+@media (min-width: 1041px) {
+  /* Scale the complete preview on short desktop viewports. Resizing the
+     Flutter host itself would reflow the app and reveal less of its content. */
+  .app-column {
+    width: min(100%, 420px);
+    justify-self: center;
+  }
+  .device-frame {
+    width: min(420px, 100%);
+    margin-inline: auto;
+    /* 887px is the frame's full height at 420px width; 112px reserves the
+       header, top gap, and a little room below the frame. */
+    zoom: clamp(.75, calc((100dvh - 112px) / 887px), 1);
+  }
+}
+
 @media (max-width: 1230px) {
   .demo-layout { grid-template-columns: minmax(180px, 1fr) minmax(350px, 420px) minmax(240px, 290px); gap: 25px; }
   .feedback-panel { padding: 25px 21px; }
