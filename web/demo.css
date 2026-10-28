@@ -248,18 +248,15 @@ a { color: inherit; }
 .site-footer p { margin: 0; }
 
 @media (min-width: 1041px) {
-  /* Scale the complete preview on short desktop viewports. Resizing the
-     Flutter host itself would reflow the app and reveal less of its content. */
+  /* Size the real Flutter viewport to fit short desktop windows. CSS zoom on
+     an ancestor can offset Flutter's canvas hit testing on some devices. */
   .app-column {
-    width: min(100%, 420px);
+    width: min(100%, clamp(340px, calc(47.35dvh - 53px), 420px));
     justify-self: center;
   }
   .device-frame {
-    width: min(420px, 100%);
+    width: 100%;
     margin-inline: auto;
-    /* 887px is the frame's full height at 420px width; 112px reserves the
-       header, top gap, and a little room below the frame. */
-    zoom: clamp(.75, calc((100dvh - 112px) / 887px), 1);
   }
 }
 

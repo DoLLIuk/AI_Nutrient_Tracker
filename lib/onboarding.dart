@@ -342,6 +342,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             color: _step == 0 ? Colors.white : const Color(0xFF0F172A),
           ),
         ),
+        actions: [
+          if (_step > 0 && widget.onExploreSample != null)
+            TextButton(
+              key: const Key('onboarding-explore-sample'),
+              onPressed: widget.onExploreSample,
+              child: const Text('Try sample plan'),
+            ),
+        ],
       ),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 180),

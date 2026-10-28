@@ -2702,6 +2702,8 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       text: (aiEstimate ?? 250).toStringAsFixed(0),
     );
     String? localError;
+    bool submittingPortion = false;
+    bool submittingAiEstimate = false;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -2723,8 +2725,9 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
           child: StatefulBuilder(
             builder: (context, setModalState) {
               final isLoading =
+                  submittingPortion ||
                   widget.controller.state.status ==
-                  HomeStatus.confirmingPortion;
+                      HomeStatus.confirmingPortion;
               return Material(
                 color: Colors.transparent,
                 child: SingleChildScrollView(
@@ -2791,15 +2794,29 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                       '.',
                                     ),
                                   );
-                                  final ok = await widget.controller
-                                      .confirmPortion(
-                                        grams,
-                                        baseRevision: baseRevision,
-                                      );
-                                  if (!context.mounted) return;
-                                  if (ok) Navigator.of(context).pop();
+                                  setModalState(() {
+                                    submittingPortion = true;
+                                    submittingAiEstimate = false;
+                                  });
+                                  try {
+                                    final ok = await widget.controller
+                                        .confirmPortion(
+                                          grams,
+                                          baseRevision: baseRevision,
+                                        );
+                                    if (context.mounted && ok) {
+                                      Navigator.of(context).pop();
+                                    }
+                                  } finally {
+                                    if (context.mounted) {
+                                      setModalState(() {
+                                        submittingPortion = false;
+                                        submittingAiEstimate = false;
+                                      });
+                                    }
+                                  }
                                 },
-                          child: isLoading
+                          child: isLoading && !submittingAiEstimate
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
@@ -2818,14 +2835,36 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                           onPressed: isLoading || aiEstimate == null
                               ? null
                               : () async {
-                                  final ok = await widget.controller
-                                      .confirmPortionWithAiEstimate(
-                                        baseRevision: baseRevision,
-                                      );
-                                  if (!context.mounted) return;
-                                  if (ok) Navigator.of(context).pop();
+                                  setModalState(() {
+                                    submittingPortion = true;
+                                    submittingAiEstimate = true;
+                                  });
+                                  try {
+                                    final ok = await widget.controller
+                                        .confirmPortionWithAiEstimate(
+                                          baseRevision: baseRevision,
+                                        );
+                                    if (context.mounted && ok) {
+                                      Navigator.of(context).pop();
+                                    }
+                                  } finally {
+                                    if (context.mounted) {
+                                      setModalState(() {
+                                        submittingPortion = false;
+                                        submittingAiEstimate = false;
+                                      });
+                                    }
+                                  }
                                 },
-                          child: const Text('Not sure, use AI estimate'),
+                          child: submittingAiEstimate
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Not sure, use AI estimate'),
                         ),
                       ),
                     ],
@@ -3421,7 +3460,50 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                 ),
               ),
             ),
-            if (isLoading)
+            if (state.status == HomeStatus.uploading)
+              Positioned.fill(
+                child: AbsorbPointer(
+                  key: const Key('photo-analysis-progress'),
+                  child: ColoredBox(
+                    color: const Color(0xB2F7F8FA),
+                    child: Center(
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 260),
+                        margin: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0x180F172A), blurRadius: 24),
+                          ],
+                        ),
+                        child: const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircularProgressIndicator(),
+                            SizedBox(height: 16),
+                            Text(
+                              'Analyzing your meal…',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            SizedBox(height: 6),
+                            Text(
+                              'This can take a moment.',
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (isLoading && state.status != HomeStatus.uploading)
               const Positioned(
                 top: 0,
                 left: 0,
@@ -3559,6 +3641,7 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
   Widget _buildDaysRow() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      reverse: true,
       child: Row(
         children: List.generate(days.length, (index) {
           final isSelected = index == selectedDay;

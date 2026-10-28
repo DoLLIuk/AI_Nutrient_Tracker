@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -96,6 +97,45 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('demo-quick-start-card')), findsOneWidget);
     expect(prefs.getBool('app.demo.full_onboarding'), isFalse);
+  });
+
+  testWidgets('a returning demo visitor can leave an unfinished onboarding', (
+    tester,
+  ) async {
+    const draft = OnboardingDraft(
+      step: 2,
+      goalType: GoalType.maintain,
+      sexType: SexType.female,
+      activityLevel: null,
+      targetPace: null,
+      macroProfile: MacroProfile.balanced,
+      heightUnit: HeightUnit.cm,
+      weightUnit: WeightUnit.kg,
+      ageText: '30',
+      heightText: '165',
+      feetText: '',
+      inchesText: '',
+      weightText: '65',
+    );
+    SharedPreferences.setMockInitialValues({
+      'app.demo.full_onboarding': true,
+      'app.onboarding.draft': jsonEncode(draft.toJson()),
+    });
+    await tester.pumpWidget(MyApp(enableDemoQuickStart: true));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Basic profile'), findsOneWidget);
+    expect(find.byKey(const Key('onboarding-explore-sample')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('onboarding-explore-sample')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('demo-quick-start-card')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('demo-personalize')));
+    await tester.pumpAndSettle();
+    expect(find.text('Basic profile'), findsOneWidget);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('app.demo.full_onboarding'), isTrue);
+    expect(prefs.getString('app.onboarding.draft'), isNotNull);
   });
 
   testWidgets('tap + opens source bottom sheet', (tester) async {
@@ -447,6 +487,34 @@ void main() {
       expect(find.text('Clarified meal estimate'), findsWidgets);
     },
   );
+
+  testWidgets('photo analysis shows progress until the response arrives', (
+    tester,
+  ) async {
+    final repository = _HeldAnalysisRepository();
+    final controller = PhotoFoodController(
+      repository: repository,
+      photoPicker: _FakePicker(
+        file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'fake.jpg'),
+      ),
+    );
+    await tester.pumpWidget(
+      MyApp(controller: controller, skipOnboarding: true),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('fab-add')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('pick-gallery')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('clarification-skip')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('photo-analysis-progress')), findsOneWidget);
+    expect(find.text('Analyzing your meal…'), findsOneWidget);
+    repository.release.complete();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('photo-analysis-progress')), findsNothing);
+  });
 
   testWidgets(
     'skip keeps single request and no manual improve action is shown later',
@@ -1536,7 +1604,9 @@ void main() {
       }),
     });
 
-    await tester.pumpWidget(MyApp(controller: controller, enableDemoQuickStart: true));
+    await tester.pumpWidget(
+      MyApp(controller: controller, enableDemoQuickStart: true),
+    );
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('fab-add')), findsOneWidget);
     expect(find.byKey(const Key('demo-quick-start-card')), findsNothing);
@@ -1569,7 +1639,9 @@ void main() {
       }),
     });
 
-    await tester.pumpWidget(MyApp(controller: controller, enableDemoQuickStart: true));
+    await tester.pumpWidget(
+      MyApp(controller: controller, enableDemoQuickStart: true),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Basic profile'), findsOneWidget);
@@ -3005,6 +3077,28 @@ class _RecordingAnalytics implements Analytics {
 
   @override
   void track(AnalyticsEvent event) => events.add(event);
+}
+
+class _HeldAnalysisRepository extends _FakeRepository {
+  final release = Completer<void>();
+
+  @override
+  Future<PhotoFoodResponse> analyzePhoto(
+    XFile image, {
+    String locale = 'en-US',
+    String? mealTime,
+    PhotoClarificationInput? clarification,
+    String? operationId,
+  }) async {
+    await release.future;
+    return super.analyzePhoto(
+      image,
+      locale: locale,
+      mealTime: mealTime,
+      clarification: clarification,
+      operationId: operationId,
+    );
+  }
 }
 
 class _FakeRepository implements PhotoFoodRepository {
