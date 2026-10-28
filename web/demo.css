@@ -136,24 +136,16 @@ a { color: inherit; }
   background: #e7ebe4;
   box-shadow: 0 24px 75px #1e3b271c, 0 4px 14px #1e3b270c;
 }
-#flutter_host {
+#flutter_preview {
+  display: block;
   position: relative;
   overflow: hidden;
   width: 100%;
-  /* Keep a phone-shaped viewport even in short browser windows. The page
-     scrolls around the frame; browser chrome must not squash the app. */
   height: auto;
   aspect-ratio: 9 / 19.5;
+  border: 0;
   border-radius: 30px;
   background: #fff;
-}
-.app-loading {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-  font-size: 13px;
 }
 
 .feedback-panel {
@@ -248,15 +240,16 @@ a { color: inherit; }
 .site-footer p { margin: 0; }
 
 @media (min-width: 1041px) {
-  /* Size the real Flutter viewport to fit short desktop windows. CSS zoom on
-     an ancestor can offset Flutter's canvas hit testing on some devices. */
+  /* Scale the complete phone. Flutter runs in its own frame with a stable
+     400px viewport, so browser pointer coordinates are mapped by the iframe. */
   .app-column {
-    width: min(100%, clamp(340px, calc(47.35dvh - 53px), 420px));
+    width: min(100%, 420px);
     justify-self: center;
   }
   .device-frame {
-    width: 100%;
+    width: min(420px, 100%);
     margin-inline: auto;
+    zoom: clamp(.75, calc((100dvh - 112px) / 887px), 1);
   }
 }
 
@@ -339,7 +332,7 @@ a { color: inherit; }
   .app-column { width: 100%; max-width: 420px; align-self: center; }
   .app-caption { display: flex; padding: 0 2px; margin-bottom: 10px; }
   .device-frame { padding: 5px; border-radius: 25px; }
-  #flutter_host { border-radius: 20px; }
+  #flutter_preview { border-radius: 20px; }
   .site-footer { padding: 14px 0 78px; }
   .feedback-panel { width: min(390px, 100vw); border-radius: 0; }
 }
