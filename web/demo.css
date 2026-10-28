@@ -26,7 +26,7 @@ a { color: inherit; }
 }
 
 .site-header {
-  height: 92px;
+  height: 80px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -65,7 +65,7 @@ a { color: inherit; }
   gap: clamp(28px, 3.5vw, 64px);
   padding: 24px 0 8px;
 }
-.intro { max-width: 460px; padding-top: 36px; }
+.intro { max-width: 460px; }
 .eyebrow {
   margin: 0 0 21px;
   color: #49785d;
@@ -120,7 +120,7 @@ a { color: inherit; }
 
 .app-column { min-width: 0; }
 .app-caption {
-  display: flex;
+  display: none;
   align-items: center;
   min-height: 21px;
   margin-bottom: 15px;
@@ -158,7 +158,7 @@ a { color: inherit; }
 
 .feedback-panel {
   position: relative;
-  margin-top: 37px;
+  margin-top: 0;
   padding: 30px 27px 25px;
   border: 1px solid #dfe7d8;
   border-radius: 20px;
@@ -254,7 +254,7 @@ a { color: inherit; }
 }
 @media (max-width: 1040px) {
   .demo-layout { grid-template-columns: minmax(180px, 1fr) minmax(350px, 420px); justify-content: center; gap: 40px; }
-  .intro { padding-top: 36px; }
+  .intro { padding-top: 0; }
   .feedback-panel {
     position: fixed;
     z-index: 30;
@@ -324,7 +324,7 @@ a { color: inherit; }
   .intro-copy { margin: 16px 0 0; font-size: 13px; line-height: 1.6; }
   .intro-guide, .intro-note { display: none; }
   .app-column { width: 100%; max-width: 420px; align-self: center; }
-  .app-caption { padding: 0 2px; margin-bottom: 10px; }
+  .app-caption { display: flex; padding: 0 2px; margin-bottom: 10px; }
   .device-frame { padding: 5px; border-radius: 25px; }
   #flutter_host { border-radius: 20px; }
   .site-footer { padding: 14px 0 78px; }
