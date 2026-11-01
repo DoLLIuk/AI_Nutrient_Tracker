@@ -918,6 +918,38 @@ void main() {
     expect(find.text('Add a meal to see how this day looked'), findsOneWidget);
   });
 
+  testWidgets('week row uses calendar dates across the fall time change', (
+    tester,
+  ) async {
+    final controller = PhotoFoodController(
+      repository: _FakeRepository(),
+      photoPicker: _FakePicker(file: null),
+    );
+    await tester.pumpWidget(
+      MyApp(
+        controller: controller,
+        skipOnboarding: true,
+        nowProvider: () => DateTime(2026, 11, 1, 12),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('day-chip-5')),
+        matching: find.text('SUN'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('day-chip-6')),
+        matching: find.text('MON'),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'coach card uses historical summary instead of next meal advice on past day',
     (tester) async {
@@ -1197,6 +1229,38 @@ void main() {
     );
 
     await tester.tap(find.byKey(const Key('day-chip-4')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Yesterday was light on protein'), findsNothing);
+  });
+
+  testWidgets('coach does not judge yesterday without yesterday meals', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'app.meals': jsonEncode([
+        _mealJson(
+          requestId: 'today_only',
+          day: _fixedToday,
+          timestamp: _fixedNow,
+          kcal: 900,
+          proteinG: 90,
+          mealType: 'lunch',
+          sessionId: 'session_today_only',
+        ),
+      ]),
+    });
+    await tester.pumpWidget(
+      MyApp(
+        controller: PhotoFoodController(
+          repository: _FakeRepository(),
+          photoPicker: _FakePicker(file: null),
+        ),
+        skipOnboarding: true,
+        onboardingResult: _testOnboardingResult(),
+        nowProvider: () => _fixedNow,
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Yesterday was light on protein'), findsNothing);
@@ -1711,6 +1775,60 @@ void main() {
       );
     },
   );
+
+  testWidgets('saved meal can be deleted after confirmation', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'app.debug.meal_details': false,
+      'app.meals': jsonEncode([
+        _mealJson(
+          requestId: 'delete_me',
+          day: _fixedToday,
+          timestamp: _fixedNow,
+          kcal: 500,
+          proteinG: 30,
+          mealType: 'lunch',
+          sessionId: 'session_delete_me',
+        ),
+      ]),
+    });
+    final analytics = _RecordingAnalytics();
+    await tester.pumpWidget(
+      MyApp(
+        controller: PhotoFoodController(
+          repository: _FakeRepository(),
+          photoPicker: _FakePicker(file: null),
+        ),
+        analytics: analytics,
+        skipOnboarding: true,
+        nowProvider: () => _fixedNow,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('delete_me').first);
+    await tester.tap(find.text('delete_me').first);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('meal-delete-trigger')));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete this meal?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Meal'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('meal-delete-trigger')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('meal-delete-confirm')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('delete_me'), findsNothing);
+    expect(
+      analytics.events.map((event) => event.name),
+      contains(AnalyticsEvents.mealDeleted),
+    );
+    final prefs = await SharedPreferences.getInstance();
+    expect(jsonDecode(prefs.getString('app.meals')!) as List, isEmpty);
+    expect(prefs.getStringList('app.meals.deleted_ids'), contains('delete_me'));
+  });
   testWidgets(
     'new manual meal uses disappearing example hints instead of zero values',
     (tester) async {

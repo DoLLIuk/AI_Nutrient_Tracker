@@ -685,9 +685,9 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
 
   List<_DayItem> get days {
     final today = _dateOnly(_now);
-    final start = today.subtract(const Duration(days: 5));
     return List.generate(7, (i) {
-      final day = start.add(Duration(days: i));
+      // Calendar dates must not be advanced by 24-hour intervals across DST.
+      final day = DateTime(today.year, today.month, today.day - 5 + i);
       return _DayItem(
         weekDay: _weekdayLabel(day.weekday),
         dayNum: day.day.toString(),
@@ -1658,6 +1658,45 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
       Navigator.of(context).pop();
     }
 
+    Future<void> deleteEditingMeal(BuildContext sheetContext) async {
+      final mealToDelete = editingMeal;
+      if (mealToDelete == null) return;
+      final confirmed = await showDialog<bool>(
+        context: sheetContext,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Delete this meal?'),
+          content: const Text('This removes it from your meal history.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const Key('meal-delete-confirm'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFB42318),
+              ),
+              child: const Text('Delete meal'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted || !sheetContext.mounted) return;
+      setState(() {
+        meals.removeWhere((meal) => meal.requestId == mealToDelete.requestId);
+        _rebuildSessionsForDay(mealToDelete.day, notify: false);
+      });
+      _notifyMealsChanged();
+      widget.analytics.track(
+        AnalyticsEvent(
+          AnalyticsEvents.mealDeleted,
+          properties: {'source': mealToDelete.origin.name},
+        ),
+      );
+      Navigator.of(sheetContext).pop();
+    }
+
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -2358,6 +2397,19 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
                                 ),
                               ),
                             ),
+                            if (editingMeal != null) ...[
+                              const SizedBox(height: 6),
+                              Center(
+                                child: TextButton(
+                                  key: const Key('meal-delete-trigger'),
+                                  onPressed: () => deleteEditingMeal(context),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: const Color(0xFFB42318),
+                                  ),
+                                  child: const Text('Delete meal'),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -3318,9 +3370,14 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
         final fat = _sumFats;
         final proteinTarget =
             widget.onboardingResult?.plan.proteinTargetG.toDouble() ?? 150.0;
-        final yesterday = _selectedDate.subtract(const Duration(days: 1));
+        final selectedDate = _selectedDate;
+        final yesterday = DateTime(
+          selectedDate.year,
+          selectedDate.month,
+          selectedDate.day - 1,
+        );
         final coachContent = _coachEvaluator.evaluate(
-          selectedDate: _selectedDate,
+          selectedDate: selectedDate,
           now: now,
           hasMealsForSelectedDay: hasMealsForSelectedDay,
           consumedKcal: consumed,
@@ -3328,6 +3385,9 @@ class _CaloriesHomePageState extends State<_CaloriesHomePage> {
           calorieTarget: calorieTarget,
           proteinTarget: proteinTarget,
           yesterdayProtein: _proteinForDay(yesterday),
+          hasMealsYesterday: meals.any(
+            (meal) => _isSameDate(meal.day, yesterday),
+          ),
         );
 
         final isLoading =

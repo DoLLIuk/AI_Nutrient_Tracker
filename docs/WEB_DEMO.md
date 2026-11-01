@@ -1,6 +1,6 @@
 # Web demo: architecture and operations
 
-Last verified configuration: 2026-09-26.
+Last verified configuration: 2026-11-01.
 
 ## Published version
 
@@ -27,7 +27,7 @@ GitHub Pages serves `web/` and the compiled Flutter app. The site embeds `app.ht
 
 - New web visitors without a completed profile or an active onboarding choice land on Home with an explicitly labeled example plan (woman, 30 years, 165 cm, 65 kg, lightly active, maintenance; 1884 kcal, 104 g protein, 250 g carbs, 52 g fat). This is a sample, not a personal target. It is computed with the same plan function as onboarding and is not saved as their profile.
 - The Home sample card opens the sample-meal picker directly and links to the complete onboarding. Visitors can return from the welcome screen or any unfinished onboarding step to the sample plan; the draft remains available when they choose to personalize again. Completed profiles and in-progress onboarding are restored from browser storage; meals stay intact when a visitor personalizes the plan.
-- Gateway events `demo_quick_start_viewed`, `demo_sample_meal_tapped`, and `demo_personalize_tapped` distinguish the new entry path. These names must be deployed to the gateway allowlist before the Pages client uses them. No sample profile details are sent as event properties.
+- Gateway events `demo_quick_start_viewed`, `demo_sample_meal_tapped`, and `demo_personalize_tapped` distinguish the new entry path. Gateway revision `ai-nutrient-demo-gateway-00006-xiz` accepts all three event names as of November 1, 2026. No sample profile details are sent as event properties.
 - The basic-profile onboarding step offers clearly labeled sample values: female, 30 years, 165 cm, 65 kg. Other onboarding choices remain interactive.
 - Five generated sample food photos are bundled under `assets/demo_food/`; uploads and sample photos both use real AI analysis.
 - Photo analysis shows an in-app progress panel until the response arrives. Portion-confirmation buttons show progress while their request is pending.
@@ -58,6 +58,12 @@ Firestore collections:
 - `demo_events`: admitted action, server timestamp, visitor hash, diagnostic trace ID, and optional app event/step. Rejections and upstream outcomes are available in Cloud Run logs.
 
 No automatic event retention/cleanup policy was added. Browser IDs are pseudonymous, not authenticated identities; web counts should not be treated as exact unique-person metrics.
+
+### Reading demo usage
+
+The September 27 gateway revision did not recognize the three quick-start event names added to the Pages client on October 28. Requests for those names returned HTTP 400 and were not written to Firestore. The current gateway revision accepts them. Do not infer quick-start conversion from events before November 1, 2026.
+
+Keep historical `demo_events` intact. For a clean new-browser count, record a reporting cutoff after the site and gateway are both updated, then count distinct `visitor_hash` values whose **first recorded event** is after that cutoff. Subtracting one day's `app_opened` events from a cumulative total is invalid: repeat opens are events, not new browsers. Exclude known owner/test browser hashes in a separate reporting filter, not by deleting Firestore documents or guessing from activity times. Production QA requests still consume the same quotas. The November 1 gateway verification used a synthetic browser ID and trace IDs beginning `qa_gateway_`; exclude that known synthetic ID from future visitor reports.
 
 ## Publishing changes
 

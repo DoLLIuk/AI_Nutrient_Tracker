@@ -43,6 +43,7 @@ class HomeCoachEvaluator {
     required double calorieTarget,
     required double proteinTarget,
     required double yesterdayProtein,
+    required bool hasMealsYesterday,
   }) {
     final today = DateTime(now.year, now.month, now.day);
     final selectedDay = DateTime(
@@ -105,7 +106,7 @@ class HomeCoachEvaluator {
       );
     }
 
-    if (isToday && proteinDeficitYesterday >= 15) {
+    if (isToday && hasMealsYesterday && proteinDeficitYesterday >= 15) {
       return CoachCardContent(
         state: CoachCardState.lowProteinYesterday,
         primary: 'Yesterday was light on protein',
