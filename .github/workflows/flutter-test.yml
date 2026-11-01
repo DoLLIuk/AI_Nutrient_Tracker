@@ -45,11 +45,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Java 17 for Android build
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
+
+      - name: Use Java 17 for Flutter
+        run: flutter config --jdk-dir="$JAVA_HOME"
 
       - name: Install dependencies
         run: flutter pub get
